@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='kgraphplanner',
-    version='0.0.1',
+    version='0.0.2',
     author='Marc Hadfield',
     author_email='marc@vital.ai',
     description='KGraph Planner',
@@ -25,8 +25,14 @@ setup(
         'vital-ai-aimp>=0.1.7',
         'vital-ai-haley-kg>=0.1.13',
         'kgraphagent>=0.0.1',
+        'vital-agent-kg-utils>=0.1.0',
         'langchain==0.2.12',
-        'langchain-openai==0.1.20'
+        'langchain-openai==0.1.20',
+        'langgraph==0.2.3',
+        'langgraph-checkpoint==1.0.2',
+        'langsmith==0.1.99',
+        'python-dotenv',
+        'rich==13.7.1'
     ],
     extras_require={
         'dev': [

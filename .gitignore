@@ -4,4 +4,5 @@ dist/*
 .idea/*
 **/*.yaml
 .env
+**/__pycache__/*
 
