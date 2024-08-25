@@ -21,7 +21,7 @@ setup(
     },
     license='Apache License 2.0',
     install_requires=[
-        'vital-ai-vitalsigns>=0.1.19',
+        'vital-ai-vitalsigns>=0.1.20',
         'vital-ai-aimp>=0.1.7',
         'vital-ai-haley-kg>=0.1.13',
         'kgraphagent>=0.0.1',
