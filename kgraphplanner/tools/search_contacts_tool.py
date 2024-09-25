@@ -4,10 +4,11 @@ from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
 
+# Note: this is meant to be implemented via a knowledge graph query of the user's knowledge graph
 
 class Contact(TypedDict):
     """
-    Contact is a dictionary that represents an contact from a contact list
+    Contact is a dictionary that represents a contact from a contact list
 
     Attributes:
         contact_name (str): Name of Contact

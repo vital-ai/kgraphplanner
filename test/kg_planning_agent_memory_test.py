@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -6,16 +5,13 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from rich.console import Console
 from kgraphplanner.agent.kg_planning_agent import KGPlanningAgent
 from langchain_openai import ChatOpenAI
-from typing import Literal, Tuple
-from langchain_core.tools import tool
 
-from kgraphplanner.agent.tool_executor import ToolExecutor
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
-from kgraphplanner.tools.place_search_tool import PlaceSearchTool
+from kgraphplanner.tools.place_search.place_search_tool import PlaceSearchTool
 from kgraphplanner.tools.search_contacts_tool import SearchContactsTool
-from kgraphplanner.tools.send_message_tool import SendMessageTool
-from kgraphplanner.tools.weather_info_tool import WeatherInfoTool
+from kgraphplanner.tools.send_message.send_message_tool import SendMessageTool
+from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 import logging
 from langchain.callbacks.base import BaseCallbackHandler
 
