@@ -3,7 +3,7 @@ from langchain_core.load.serializable import Serializable
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langchain_core.tools import tool as create_tool
-from langgraph.utils import RunnableCallable
+from langgraph.utils.runnable import RunnableCallable
 
 INVALID_TOOL_MSG_TEMPLATE = (
     "{requested_tool_name} is not a valid tool, "

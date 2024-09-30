@@ -4,10 +4,10 @@ from typing import (
     Optional,
     Sequence,
     Type,
-    TypedDict,
     TypeVar,
     Union,
 )
+from typing_extensions import TypedDict
 
 from langchain_core.language_models import LanguageModelLike
 

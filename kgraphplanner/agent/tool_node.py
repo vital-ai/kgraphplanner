@@ -19,9 +19,9 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import get_config_list, get_executor_for_config
 from langchain_core.tools import BaseTool, InjectedToolArg
 from langchain_core.tools import tool as create_tool
+from langgraph.utils.runnable import RunnableCallable
 from typing_extensions import get_args
 
-from langgraph.utils import RunnableCallable
 
 INVALID_TOOL_NAME_ERROR_TEMPLATE = (
     "Error: {requested_tool} is not a valid tool, try one of [{available_tools}]."

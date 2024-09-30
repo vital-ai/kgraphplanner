@@ -1,8 +1,9 @@
-from typing import Callable, Tuple, TypedDict, List
+from typing import Callable, Tuple, List
 from langchain_core.tools import tool
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
+from typing_extensions import TypedDict
 
 # Note: this is meant to be implemented via a knowledge graph query of the user's knowledge graph
 

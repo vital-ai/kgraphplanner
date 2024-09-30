@@ -5,4 +5,5 @@ dist/*
 **/*.yaml
 .env
 **/__pycache__/*
+test/*.png
 

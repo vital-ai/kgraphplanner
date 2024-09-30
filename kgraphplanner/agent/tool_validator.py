@@ -22,10 +22,10 @@ from langchain_core.runnables import (
 )
 from langchain_core.runnables.config import get_executor_for_config
 from langchain_core.tools import BaseTool, create_schema_from_function
+from langgraph.utils.runnable import RunnableCallable
 from pydantic import BaseModel as BaseModelV2
 from pydantic import ValidationError as ValidationErrorV2
 
-from langgraph.utils import RunnableCallable
 
 
 def _default_format_error(
