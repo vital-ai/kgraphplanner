@@ -25,8 +25,10 @@ class PlaceSearchTool(AbstractTool):
 
             print(f"PlaceSearchTool called with location: {location}")
 
+            # Philadelphia, PA
             # return 39.952583, -75.165222
 
+            # Manhattan, NYC
             return 40.7128, -74.0060
 
         return place_search
