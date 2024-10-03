@@ -57,81 +57,12 @@ StateModifier = Union[
 ]
 
 
-class KGPlanningAgent:
-    def __init__(self,
-                 model: LanguageModelLike,
-                 tools: Union[ToolExecutor, Sequence[BaseTool]],
-                 *,
-                 state_schema: Optional[StateSchemaType] = None,
-                 messages_modifier: Optional[MessagesModifier] = None,
-                 state_modifier: Optional[StateModifier] = None,
-                 checkpointer: Optional[BaseCheckpointSaver] = None,
-                 interrupt_before: Optional[Sequence[str]] = None,
-                 interrupt_after: Optional[Sequence[str]] = None,
-                 debug: bool = False,
-                 ):
+class KGPlanningBaseAgent:
+    # this is essentially an abstract class to use as base for agents
 
+    def __init__(self):
         self.initialized = False
-
-        self.model = model
-        self.tools = tools
-        self.state_schema = state_schema
-        self.messages_modifier = messages_modifier
-        self.state_modifier = state_modifier
-        self.checkpointer = checkpointer
-        self.interrupt_before = interrupt_before
-        self.interrupt_after = interrupt_after
-        self.debug = debug
-
-        if self.state_schema is not None:
-            if missing_keys := {"messages", "is_last_step"} - set(
-                    self.state_schema.__annotations__
-            ):
-                raise ValueError(f"Missing required key(s) {missing_keys} in state_schema")
-
-        if isinstance(self.tools, ToolExecutor):
-            self.tool_classes = self.tools.tools
-        else:
-            self.tool_classes = self.tools
-        self.model = self.model.bind_tools(self.tool_classes)
-
-        self.preprocessor = self._get_model_preprocessing_runnable(self.state_modifier, self.messages_modifier)
-        self.model_runnable = self.preprocessor | self.model
-
-        self.workflow = StateGraph(self.state_schema or AgentState)
-
-        # Define the two nodes we will cycle between
-        self.workflow.add_node("agent", RunnableLambda(self.call_model, self.acall_model))
-        self.workflow.add_node("tools", ToolNode(self.tool_classes))
-
-        # Set the entrypoint as `agent`
-        # This means that this node is the first one called
-        self.workflow.set_entry_point("agent")
-
-        # We now add a conditional edge
-        self.workflow.add_conditional_edges(
-            # First, we define the start node. We use `agent`.
-            # This means these are the edges taken after the `agent` node is called.
-            "agent",
-            # Next, we pass in the function that will determine which node is called next.
-            self.should_continue,
-            # Finally we pass in a mapping.
-            # The keys are strings, and the values are other nodes.
-            # END is a special node marking that the graph should finish.
-            # What will happen is we will call `should_continue`, and then the output of that
-            # will be matched against the keys in this mapping.
-            # Based on which one it matches, that node will then be called.
-            {
-                # If `tools`, then we call the tool node.
-                "continue": "tools",
-                # Otherwise we finish.
-                "end": END,
-            },
-        )
-
-        self.workflow.add_edge("tools", "agent")
-
-        self.compiled_state_graph: CompiledGraph = None
+        self.model_runnable = None
 
     def _convert_messages_modifier_to_state_modifier(self,
                                                      messages_modifier: MessagesModifier
@@ -248,4 +179,147 @@ class KGPlanningAgent:
         # We return a list, because this will get added to the existing list
         return {"messages": [response]}
 
+
+class KGPlanningAgent(KGPlanningBaseAgent):
+    def __init__(self, model: LanguageModelLike, tools: Union[ToolExecutor, Sequence[BaseTool]], *,
+                 state_schema: Optional[StateSchemaType] = None, messages_modifier: Optional[MessagesModifier] = None,
+                 state_modifier: Optional[StateModifier] = None, checkpointer: Optional[BaseCheckpointSaver] = None,
+                 interrupt_before: Optional[Sequence[str]] = None, interrupt_after: Optional[Sequence[str]] = None,
+                 debug: bool = False):
+
+        super().__init__()
+        self.initialized = False
+
+        self.model = model
+        self.tools = tools
+        self.state_schema = state_schema
+        self.messages_modifier = messages_modifier
+        self.state_modifier = state_modifier
+        self.checkpointer = checkpointer
+        self.interrupt_before = interrupt_before
+        self.interrupt_after = interrupt_after
+        self.debug = debug
+
+        if self.state_schema is not None:
+            if missing_keys := {"messages", "is_last_step"} - set(
+                    self.state_schema.__annotations__
+            ):
+                raise ValueError(f"Missing required key(s) {missing_keys} in state_schema")
+
+        if isinstance(self.tools, ToolExecutor):
+            self.tool_classes = self.tools.tools
+        else:
+            self.tool_classes = self.tools
+
+        self.model = self.model.bind_tools(self.tool_classes)
+
+        self.preprocessor = self._get_model_preprocessing_runnable(self.state_modifier, self.messages_modifier)
+        self.model_runnable = self.preprocessor | self.model
+
+        self.workflow = StateGraph(self.state_schema or AgentState)
+
+        # Define the two nodes we will cycle between
+        self.workflow.add_node("agent", RunnableLambda(self.call_model, self.acall_model))
+        self.workflow.add_node("tools", ToolNode(self.tool_classes))
+
+        # Set the entrypoint as `agent`
+        # This means that this node is the first one called
+        self.workflow.set_entry_point("agent")
+
+        # We now add a conditional edge
+        self.workflow.add_conditional_edges(
+            # First, we define the start node. We use `agent`.
+            # This means these are the edges taken after the `agent` node is called.
+            "agent",
+            # Next, we pass in the function that will determine which node is called next.
+            self.should_continue,
+            # Finally we pass in a mapping.
+            # The keys are strings, and the values are other nodes.
+            # END is a special node marking that the graph should finish.
+            # What will happen is we will call `should_continue`, and then the output of that
+            # will be matched against the keys in this mapping.
+            # Based on which one it matches, that node will then be called.
+            {
+                # If `tools`, then we call the tool node.
+                "continue": "tools",
+                # Otherwise we finish.
+                "end": END,
+            },
+        )
+
+        self.workflow.add_edge("tools", "agent")
+
+        self.compiled_state_graph: CompiledGraph = None
+
+
+class KGPlanningStructuredAgent(KGPlanningBaseAgent):
+    def __init__(self, model: LanguageModelLike, tools: Union[ToolExecutor, Sequence[BaseTool]], *,
+                 state_schema: Optional[StateSchemaType] = None, messages_modifier: Optional[MessagesModifier] = None,
+                 state_modifier: Optional[StateModifier] = None, checkpointer: Optional[BaseCheckpointSaver] = None,
+                 interrupt_before: Optional[Sequence[str]] = None, interrupt_after: Optional[Sequence[str]] = None,
+                 debug: bool = False):
+
+        super().__init__()
+        self.initialized = False
+
+        self.model = model
+        self.tools = tools
+        self.state_schema = state_schema
+        self.messages_modifier = messages_modifier
+        self.state_modifier = state_modifier
+        self.checkpointer = checkpointer
+        self.interrupt_before = interrupt_before
+        self.interrupt_after = interrupt_after
+        self.debug = debug
+
+        if self.state_schema is not None:
+            if missing_keys := {"messages", "is_last_step"} - set(
+                    self.state_schema.__annotations__
+            ):
+                raise ValueError(f"Missing required key(s) {missing_keys} in state_schema")
+
+        if isinstance(self.tools, ToolExecutor):
+            self.tool_classes = self.tools.tools
+        else:
+            self.tool_classes = self.tools
+
+        self.model = self.model.bind_tools(self.tool_classes)
+
+        self.preprocessor = self._get_model_preprocessing_runnable(self.state_modifier, self.messages_modifier)
+        self.model_runnable = self.preprocessor | self.model
+
+        self.workflow = StateGraph(self.state_schema or AgentState)
+
+        # Define the two nodes we will cycle between
+        self.workflow.add_node("agent", RunnableLambda(self.call_model, self.acall_model))
+        self.workflow.add_node("tools", ToolNode(self.tool_classes))
+
+        # Set the entrypoint as `agent`
+        # This means that this node is the first one called
+        self.workflow.set_entry_point("agent")
+
+        # We now add a conditional edge
+        self.workflow.add_conditional_edges(
+            # First, we define the start node. We use `agent`.
+            # This means these are the edges taken after the `agent` node is called.
+            "agent",
+            # Next, we pass in the function that will determine which node is called next.
+            self.should_continue,
+            # Finally we pass in a mapping.
+            # The keys are strings, and the values are other nodes.
+            # END is a special node marking that the graph should finish.
+            # What will happen is we will call `should_continue`, and then the output of that
+            # will be matched against the keys in this mapping.
+            # Based on which one it matches, that node will then be called.
+            {
+                # If `tools`, then we call the tool node.
+                "continue": "tools",
+                # Otherwise we finish.
+                "end": END,
+            },
+        )
+
+        self.workflow.add_edge("tools", "agent")
+
+        self.compiled_state_graph: CompiledGraph = None
 

@@ -1,7 +1,5 @@
 from typing import Callable, Tuple
-
 from langchain_core.tools import tool
-
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
@@ -27,7 +25,9 @@ class PlaceSearchTool(AbstractTool):
 
             print(f"PlaceSearchTool called with location: {location}")
 
-            return 39.952583, -75.165222
+            # return 39.952583, -75.165222
+
+            return 40.7128, -74.0060
 
         return place_search
 
