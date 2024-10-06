@@ -1,18 +1,25 @@
-from abc import ABC
 from abc import ABC, abstractmethod
 from typing import Callable
 
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
 
+# circular dependency
+# from kgraphplanner.tool_manager.tool_manager import ToolManager
+
 
 class AbstractTool(ABC):
-    def __init__(self, config, name: str = None):
+    def __init__(self, config, tool_manager=None, name: str = None):
         self.config = config
+        self.tool_manager = tool_manager
         if name:
             self.name = name
         else:
             self.name = self.__class__.__name__
+        if self.tool_manager:
+            from kgraphplanner.tool_manager.tool_manager import ToolManager
+            tm: ToolManager = tool_manager
+            tm.add_tool(self)
 
     @classmethod
     def get_tool_cls_name(cls) -> str:

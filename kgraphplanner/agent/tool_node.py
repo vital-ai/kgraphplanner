@@ -88,6 +88,7 @@ class ToolNode(RunnableCallable):
             tool_message: ToolMessage = self.tools_by_name[call["name"]].invoke(
                 input, config
             )
+
             # TODO: handle this properly in core
             tool_message.content = str_output(tool_message.content)
             return tool_message

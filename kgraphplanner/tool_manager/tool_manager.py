@@ -1,10 +1,15 @@
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
+from kgraphplanner.tool_manager.tool_cache import ToolCache
 
 
 class ToolManager:
     def __init__(self, config):
         self.tools = {}
         self.load_tools(config)
+        self.tool_cache = ToolCache()
+
+    def get_tool_cache(self) -> ToolCache:
+        return self.tool_cache
 
     def load_tools(self, config):
         for tool_name, tool_info in config.items():
@@ -13,17 +18,18 @@ class ToolManager:
             # Instantiate the tool class with its configuration
             self.tools[tool_name] = tool_class(tool_config)
 
-    def get_tool(self, tool_name) -> AbstractTool:
-
-        tool = self.tools.get(tool_name)
-
-        if tool:
-            return tool
-
-        return None
-
     def add_tool(self, tool: AbstractTool):
         self.tools[tool.get_tool_name()] = tool
+
+    def get_tool(self, tool_name) -> AbstractTool:
+        tool = self.tools.get(tool_name, None)
+        return tool
+
+    def get_tool_list(self) -> list[AbstractTool]:
+        tool_list = []
+        for tool_name, tool in self.tools.items():
+            tool_list.append(tool)
+        return tool_list
 
     def call_tool(self, tool_name, request):
         tool = self.tools.get(tool_name)

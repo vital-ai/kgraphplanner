@@ -9,7 +9,7 @@ from kgraphplanner.agent.kg_planning_agent import KGPlanningAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
 from kgraphplanner.tools.place_search.place_search_tool import PlaceSearchTool
-from kgraphplanner.tools.search_contacts_tool import SearchContactsTool
+from kgraphplanner.tools_internal.kgraph_query.search_contacts_tool import SearchContactsTool
 from kgraphplanner.tools.send_message.send_message_tool import SendMessageTool
 from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 
@@ -121,7 +121,7 @@ def main():
 
     memory = MemoryCheckpointer()
 
-    agent = KGPlanningAgent(model, checkpointer=memory, tools=tool_list)
+    agent = KGPlanningAgent(model=model, checkpointer=memory, tools=tool_list)
 
     graph = agent.compile()
 
@@ -140,7 +140,7 @@ def main():
     Your telephone number is 555-555-1212.
     If you look up a place location, re-use that same location as needed.
     If you generated a weather report for a location recently, you can re-use that weather report if it's for the same location.
-    Weather reports should include information about today and the next few days if available.
+    Weather reports should include information about the current weather right now, today's weather, and the next few days if available.
     """
 
     system_message = SystemMessage(content=system_message_content)

@@ -1,14 +1,23 @@
 from typing_extensions import TypedDict
-from kgraphplanner.tools.weather.weather_info_tool import WeatherReport
+from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather_response import WeatherData
+
+from kgraphplanner.structured_response.structured_response import StructuredResponse
 
 
-class WeatherResponse(TypedDict):
+class WeatherResponse(StructuredResponse):
+    """
+        Represents a daily weather prediction.
+
+        Attributes:
+            weatherReportText (str): Text giving the weather report
+            weatherReport (WeatherData): Structured data of the weather report
+    """
 
     weatherReportText: str
 
-    weatherReport: WeatherReport
+    weatherReport: WeatherData
 
-    weatherResponseNotes: str
+    # weatherResponseNotes: str
 
-    toolResponseList: list[TypedDict]
+    # toolResponseList: list[TypedDict]
 
