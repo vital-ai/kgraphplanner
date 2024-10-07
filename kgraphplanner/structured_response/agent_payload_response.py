@@ -1,9 +1,22 @@
 from typing import Optional
 
+from typing_extensions import TypedDict
+
 from kgraphplanner.structured_response.structured_response import StructuredResponse
 
 
-class AgentStatusResponse(StructuredResponse):
+class AgentPayload(TypedDict):
+    """
+    Represents a payload to include in the response to the request.
+    Attributes:
+        payload_class_name (str): The class name, which is a subclass of TypedDict
+        payload_guid (str): The identifier of the data record for this payload
+    """
+    payload_class_name: str
+    payload_guid: str
+
+
+class AgentPayloadResponse(StructuredResponse):
     """
     Represents the response and status of a request to an A.I. Agent.
         Attributes:
@@ -16,23 +29,15 @@ class AgentStatusResponse(StructuredResponse):
                     missing_input: request is pending due to missing input
                     error: error occurred, re-try is possible
                     failure: failure occurred, re-try is not possible
-            agent_include_payload (bool): true when the response should include
-                one or more structured responses
-            agent_payload_class_list (list[str]): list of payload class names
-            agent_payload_guid_list (list[str]): the list payload guids
+            agent_payload_list (list[AgentPayload]): list of payloads to include, or empty list
             agent_request_status_message (str): optional message for why a request is not complete
             missing_input (str): an optional message for what input is missing, if any
-            response_class_name (str) is AgentStatusResponse
+            response_class_name (str) is AgentPayloadResponse.
     """
 
     human_text_request: str
     agent_text_response: str
     agent_request_status: str
-    agent_include_payload: bool
-    agent_payload_class_list: list[str]
-    agent_payload_guid_list: list[str]
+    agent_payload_list: list[AgentPayload]
     agent_request_status_message: Optional[str]
     missing_input: Optional[str]
-
-
-

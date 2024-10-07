@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Callable
-
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
 
@@ -9,7 +8,7 @@ from kgraphplanner.tool_manager.tool_response import ToolResponse
 
 
 class AbstractTool(ABC):
-    def __init__(self, config, tool_manager=None, name: str = None):
+    def __init__(self, config: dict, tool_manager=None, name: str = None):
         self.config = config
         self.tool_manager = tool_manager
         if name:

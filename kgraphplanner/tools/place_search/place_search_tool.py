@@ -23,7 +23,13 @@ class PlaceSearchTool(AbstractTool):
             place_search_string=place_search_string
         )
 
-        client = VitalAgentRestResourceClient()
+        tool_endpoint = self.config.get("tool_endpoint")
+
+        tool_config = {
+            "tool_endpoint": tool_endpoint
+        }
+
+        client = VitalAgentRestResourceClient(tool_config)
 
         client_tool_response = client.handle_tool_request("place_search_tool", place_search_request)
 

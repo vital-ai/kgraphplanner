@@ -5,7 +5,7 @@ from rich.console import Console
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from kgraphplanner.agent.kg_planning_agent import KGPlanningAgent
+from kgraphplanner.agent.kg_planning_base_agent import KGPlanningAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
 from kgraphplanner.tools.place_search.place_search_tool import PlaceSearchTool
@@ -84,34 +84,44 @@ def main():
 
     model = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
 
-    # tool config
-    place_search_tool = PlaceSearchTool({})
-    weather_tool = WeatherInfoTool({})
-    search_contacts_tool = SearchContactsTool({})
-    send_message_tool = SendMessageTool({})
+    tool_endpoint = "http://localhost:8008"
 
-    tool_config = {}
+    tool_config = {
+        "tool_endpoint": tool_endpoint
+    }
+
     tool_manager = ToolManager(tool_config)
 
-    tool_manager.add_tool(place_search_tool)
-    tool_manager.add_tool(weather_tool)
-    tool_manager.add_tool(search_contacts_tool)
-    tool_manager.add_tool(send_message_tool)
+    place_search_config = {
+        "tool_endpoint": tool_endpoint,
+        "place_search_tool": {}
+    }
+    weather_config = {
+        "tool_endpoint": tool_endpoint,
+        "weather_tool": {}
+    }
+    search_contacts_config = {
+        "tool_endpoint": tool_endpoint,
+        "search_contacts_tool": {}
+    }
+    send_message_config = {
+        "tool_endpoint": tool_endpoint,
+        "send_message_tool": {}
+    }
+
+    place_search_tool = PlaceSearchTool(place_search_config, tool_manager=tool_manager)
+
+    weather_tool = WeatherInfoTool(weather_config, tool_manager=tool_manager)
+
+    search_contacts_tool = SearchContactsTool(search_contacts_config, tool_manager=tool_manager)
+
+    send_message_tool = SendMessageTool(send_message_config, tool_manager=tool_manager)
 
     # getting tools to use in agent into a function list
+    tool_function_list = []
 
-    place_search_tool_name = PlaceSearchTool.get_tool_cls_name()
-    weather_tool_name = WeatherInfoTool.get_tool_cls_name()
-    search_contacts_tool_name = SearchContactsTool.get_tool_cls_name()
-    send_message_tool_name = SendMessageTool.get_tool_cls_name()
-
-    # function list
-    tool_list = [
-        tool_manager.get_tool(place_search_tool_name).get_tool_function(),
-        tool_manager.get_tool(weather_tool_name).get_tool_function(),
-        tool_manager.get_tool(search_contacts_tool_name).get_tool_function(),
-        tool_manager.get_tool(send_message_tool_name).get_tool_function()
-    ]
+    for t in tool_manager.get_tool_list():
+        tool_function_list.append(t.get_tool_function())
 
     # Note: this isn't used, the ToolNode handles executing tools
     # tool_executor = ToolExecutor(tools=tool_list)
@@ -121,7 +131,7 @@ def main():
 
     memory = MemoryCheckpointer()
 
-    agent = KGPlanningAgent(model=model, checkpointer=memory, tools=tool_list)
+    agent = KGPlanningAgent(model=model, checkpointer=memory, tools=tool_function_list)
 
     graph = agent.compile()
 
@@ -157,6 +167,12 @@ def main():
     messages_out = []
 
     print_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
+
+    for m in messages_out:
+        t = type(m)
+        print(f"History ({t}): {m}")
+
+    exit(0)
 
     content = "who are you and who am I?"
 

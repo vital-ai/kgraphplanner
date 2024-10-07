@@ -19,12 +19,16 @@ class WeatherReport(TypedDict):
     # friendly version of WeatherData ?
 
 
+# TODO: variant that includes place name instead of lat, long and internally
+# does the lat, long lookup.  this would have one tool call instead of two.
+
 class WeatherInfoTool(AbstractTool):
 
     # add cache for recent weather reports?
 
     def handle_request(self, request: ToolRequest) -> ToolResponse:
 
+        place_label = request.get_parameter("place_label")
         latitude = request.get_parameter("latitude")
         longitude = request.get_parameter("longitude")
 
@@ -33,6 +37,7 @@ class WeatherInfoTool(AbstractTool):
         archive_date = request.get_parameter("archive_date")
 
         weather_request = WeatherRequest(
+            place_label=place_label,
             latitude=latitude,
             longitude=longitude,
             include_previous=include_previous,
@@ -40,7 +45,13 @@ class WeatherInfoTool(AbstractTool):
             archive_date=archive_date
         )
 
-        client = VitalAgentRestResourceClient()
+        tool_endpoint = self.config.get("tool_endpoint")
+
+        tool_config = {
+            "tool_endpoint": tool_endpoint
+        }
+
+        client = VitalAgentRestResourceClient(tool_config)
 
         client_tool_response = client.handle_tool_request("weather_tool", weather_request)
 
@@ -59,6 +70,7 @@ class WeatherInfoTool(AbstractTool):
 
         @tool
         def get_weather(
+                place_label: str,
                 latitude: float,
                 longitude: float,
                 include_previous: bool = False,
@@ -70,6 +82,7 @@ class WeatherInfoTool(AbstractTool):
             If you want the weather for a date older than 10 days ago, then and only then use the archive.
 
                 Attributes:
+                    place_label (str): The place label of the weather location.
                     latitude (float)
                     longitude (float)
                     include_previous (bool): include the previous 10 days weather data also
@@ -78,6 +91,7 @@ class WeatherInfoTool(AbstractTool):
             """
 
             params = {
+                'place_label': place_label,
                 'latitude': latitude,
                 'longitude': longitude,
                 'include_previous': include_previous,

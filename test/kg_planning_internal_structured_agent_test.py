@@ -7,12 +7,11 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from typing_extensions import TypedDict
-
-from kgraphplanner.agent.kg_planning_structured_agent import KGPlanningStructuredAgent
+from kgraphplanner.agent.kg_planning_base_agent import KGPlanningStructuredAgent
+from kgraphplanner.agent.kg_planning_internal_structured_agent import KGPlanningInternalStructuredAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
 from kgraphplanner.tools.place_search.place_search_tool import PlaceSearchTool
-from kgraphplanner.tools.weather.current_weather_tool import CurrentWeatherTool
 from kgraphplanner.tools_internal.kgraph_query.search_contacts_tool import SearchContactsTool
 from kgraphplanner.tools.send_message.send_message_tool import SendMessageTool
 from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
@@ -60,15 +59,10 @@ class LoggingHandler(BaseCallbackHandler):
         self.logger.setLevel(logging.INFO)
 
     def on_llm_start(self, serialized: dict, prompts: list, **kwargs):
-        self.logger.info(f"LLM Request: {serialized}")
-        self.logger.info(f"LLM Request Prompts: {prompts}")
-        self.logger.info(f"LLM Request KWArgs: {kwargs}")
-
+        self.logger.info(f"LLM Request: {prompts}")
 
     def on_llm_end(self, response, **kwargs):
-        self.logger.info(f"LLM Response: {response}")
-        self.logger.info(f"LLM Response Generations: {response.generations}")
-        self.logger.info(f"LLM Response KWArgs: {kwargs}")
+        self.logger.info(f"LLM Response: {response.generations}")
 
 
 system_message_content = """
@@ -79,6 +73,34 @@ system_message_content = """
     """
 
 
+# the guids should be listed in the structure response output
+def extract_tool_response_data(tool_manager, messages_out: List[Any]) -> List[TypedDict]:
+    capture_guids = []
+    capture_classes = {}
+    for message in messages_out:
+        if hasattr(message, 'tool_calls'):
+            for call in message.tool_calls:
+                if call['name'] == 'capture_response':
+                    args = call.get('args', {})
+                    guid = args.get('tool_response_guid')
+                    class_name = args.get('response_class_name')
+                    if guid and class_name:
+                        capture_guids.append(guid)
+                        capture_classes[guid] = class_name
+
+    print(f"capture_guids: {capture_guids}")
+    print(f"capture_classes: {capture_classes}")
+
+    captured_responses = []
+
+    for guid in capture_guids:
+        tool_data = tool_manager.get_tool_cache().get_from_cache(guid)
+        if tool_data:
+            captured_responses.append(tool_data)
+
+    return captured_responses
+
+
 def case_one(tool_manager, graph):
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
@@ -87,11 +109,9 @@ def case_one(tool_manager, graph):
 
     system_message = SystemMessage(content=system_message_content)
 
-    # content = f"{get_timestamp()}: hello there!"
+    # content = f"{get_timestamp()}: what was the weather in LA and Philly on Christmas in 2020?"
 
     content = f"{get_timestamp()}: what is the weather in LA and Philly?"
-
-    # content = f"{get_timestamp()}: what was the weather in LA and Philly on Christmas in 2020?"
 
     # content = f"{get_timestamp()}: what is the weather in Philly?"
 
@@ -110,10 +130,22 @@ def case_one(tool_manager, graph):
         t = type(m)
         print(f"History ({t}): {m}")
 
+    # there may be minor variants for cases of capturing knowledge graph objects
+    # objects for the UI, etc.
+
+    tool_response_data_list = extract_tool_response_data(tool_manager, messages_out)
+
+    # print(tool_response_data_list)
+
+    for tool_response_data in tool_response_data_list:
+        print(f"Response Data:\n{tool_response_data}\n")
+
     human_text_request = agent_status_response.get("human_text_request", None)
     agent_text_response = agent_status_response.get("agent_text_response", None)
     agent_request_status = agent_status_response.get("agent_request_status", None)
-    agent_payload_list = agent_status_response.get("agent_payload_list", [])
+    agent_include_payload = agent_status_response.get("agent_include_payload", None)
+    agent_payload_class_list = agent_status_response.get("agent_payload_class_list", None)
+    agent_payload_guid_list = agent_status_response.get("agent_payload_guid_list", None)
     agent_request_status_message = agent_status_response.get("agent_request_status_message", None)
     missing_input = agent_status_response.get("missing_input", None)
 
@@ -122,17 +154,19 @@ def case_one(tool_manager, graph):
     print(f"Human Text: {human_text_request}")
     print(f"Agent Text: {agent_text_response}")
 
-    for agent_payload in agent_payload_list:
+    if agent_include_payload:
+        print(f"Agent Payload ClassList: {agent_payload_class_list}")
+        print(f"Agent Payload GuidList: {agent_payload_guid_list}")
 
-        pp.pprint(agent_payload)
+        for guid in agent_payload_guid_list:
 
-        payload_class_name = agent_payload.get("payload_class_name", None)
-        payload_guid = agent_payload.get("payload_guid", None)
+            response_obj = tool_manager.get_tool_cache().get_from_cache(guid)
+            tool_data_class = response_obj.get("tool_data_class", None)
 
-        print("--------------------------------------")
-        print(f"Agent GUID: {payload_guid}")
-        print(f"Agent Class Name: {payload_class_name}")
-        print("--------------------------------------")
+            print("--------------------------------------")
+            print(f"Tool Data Class: {tool_data_class}")
+            pp.pprint(response_obj)
+            print("--------------------------------------")
 
 
 def case_two(tool_manager, graph):
@@ -215,10 +249,6 @@ def main():
         "tool_endpoint": tool_endpoint,
         "weather_tool": {}
     }
-    current_weather_config = {
-        "tool_endpoint": tool_endpoint,
-        "weather_tool": {}
-    }
     search_contacts_config = {
         "tool_endpoint": tool_endpoint,
         "search_contacts_tool": {}
@@ -231,8 +261,6 @@ def main():
     place_search_tool = PlaceSearchTool(place_search_config, tool_manager=tool_manager)
 
     weather_tool = WeatherInfoTool(weather_config,  tool_manager=tool_manager)
-
-    current_weather_tool = CurrentWeatherTool(current_weather_config,  tool_manager=tool_manager)
 
     search_contacts_tool = SearchContactsTool(search_contacts_config,  tool_manager=tool_manager)
 
@@ -252,7 +280,7 @@ def main():
 
     memory = MemoryCheckpointer()
 
-    agent = KGPlanningStructuredAgent(model_tools=model_tools, model_structured=model_structured, checkpointer=memory, tools=tool_function_list)
+    agent = KGPlanningInternalStructuredAgent(model_tools=model_tools, model_structured=model_structured, checkpointer=memory, tools=tool_function_list)
 
     graph = agent.compile()
 

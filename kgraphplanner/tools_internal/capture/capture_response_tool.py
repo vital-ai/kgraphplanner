@@ -1,5 +1,5 @@
 import pprint
-from typing import Callable, Tuple
+from typing import Callable, Tuple, List
 
 from kgraphplanner.structured_response.structured_response import StructuredResponse
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
@@ -18,11 +18,11 @@ class CaptureResponseTool(AbstractTool):
     def get_tool_function(self) -> Callable:
 
         @tool
-        def capture_response(response_class_name: str, tool_response_guid) -> bool:
+        def capture_response(response_class_name: str, tool_response_guid_list: List[str]) -> bool:
             """
-            Use this to capture a structured tool response.
+            Use this to capture structured tool responses.
             :param response_class_name: The name of the response class, which should be a subclass of TypedDict
-            :param tool_response_guid: The GUID of the response
+            :param tool_response_guid_list: a list of GUIDs of the response class
             """
 
             # :param structured_tool_response: The structured response to be captured
@@ -34,7 +34,7 @@ class CaptureResponseTool(AbstractTool):
             # print(f"StructuredResponse: {structured_tool_response}")
             # pp.pprint(structured_tool_response)
 
-            print(f"CaptureResponseTool called with tool_response_guid: {tool_response_guid}")
+            print(f"CaptureResponseTool called with tool_response_guid_list: {tool_response_guid_list}")
 
             return True
 

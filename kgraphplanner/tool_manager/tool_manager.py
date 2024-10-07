@@ -3,7 +3,7 @@ from kgraphplanner.tool_manager.tool_cache import ToolCache
 
 
 class ToolManager:
-    def __init__(self, config):
+    def __init__(self, config: dict):
         self.tools = {}
         self.load_tools(config)
         self.tool_cache = ToolCache()
@@ -12,7 +12,10 @@ class ToolManager:
         return self.tool_cache
 
     def load_tools(self, config):
-        for tool_name, tool_info in config.items():
+
+        tool_config = config.get('tools', {})
+
+        for tool_name, tool_info in tool_config.items():
             tool_class = tool_info['class']
             tool_config = tool_info.get('config', {})
             # Instantiate the tool class with its configuration
