@@ -19,7 +19,7 @@ from langchain_core.messages import (
 from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, StateGraph
+from langgraph.graph import END, StateGraph, add_messages
 from langgraph.graph.graph import CompiledGraph
 from langgraph.managed import IsLastStep
 from kgraphplanner.agent.tool_executor import ToolExecutor
@@ -27,8 +27,17 @@ from kgraphplanner.agent.tool_node import ToolNode
 from kgraphplanner.structured_response.agent_status_response import AgentStatusResponse
 from kgraphplanner.structured_response.weather_response import WeatherResponse
 from kgraphplanner.tools_internal.capture.capture_response_tool import CaptureResponseTool
-from kgraphplanner.agent.kg_planning_base_agent import KGPlanningBaseAgent, StateSchemaType, StateModifier, MessagesModifier, \
-    AgentState
+from kgraphplanner.agent.kg_planning_base_agent import KGPlanningBaseAgent, StateSchemaType, StateModifier, \
+    MessagesModifier, AgentState
+
+
+class AgentInternalState(AgentState):
+    """The state of the agent with internal step."""
+
+    # is there a better way to track this?
+    # this is for the internal case to remember if instructions
+    # were put into the messages
+    respond_instructions: bool
 
 
 class KGPlanningInternalStructuredAgent(KGPlanningBaseAgent):
@@ -83,7 +92,7 @@ class KGPlanningInternalStructuredAgent(KGPlanningBaseAgent):
 
         self.model_internal_runnable = self.preprocessor | self.model_internal_tools
 
-        self.workflow = StateGraph(self.state_schema or AgentState)
+        self.workflow = StateGraph(self.state_schema or AgentInternalState)
 
         self.workflow.add_node("agent", RunnableLambda(self.call_model, self.acall_model))
 
@@ -136,7 +145,7 @@ class KGPlanningInternalStructuredAgent(KGPlanningBaseAgent):
 
         return self.compiled_state_graph
 
-    def should_continue(self, state: AgentState):
+    def should_continue(self, state: AgentInternalState):
         messages = state["messages"]
         last_message = messages[-1]
         if not last_message.tool_calls:
@@ -144,7 +153,7 @@ class KGPlanningInternalStructuredAgent(KGPlanningBaseAgent):
         else:
             return "continue"
 
-    def should_respond_continue(self, state: AgentState):
+    def should_respond_continue(self, state: AgentInternalState):
         messages = state["messages"]
         last_message = messages[-1]
         if not last_message.tool_calls:
@@ -152,7 +161,7 @@ class KGPlanningInternalStructuredAgent(KGPlanningBaseAgent):
         else:
             return "continue"
 
-    def respond(self, state: AgentState, config: RunnableConfig):
+    def respond(self, state: AgentInternalState, config: RunnableConfig):
 
         print(f"State: {state}")
         print(f"Config: {config}")
@@ -224,7 +233,7 @@ class KGPlanningInternalStructuredAgent(KGPlanningBaseAgent):
 
         return {"messages": [response]}
 
-    def end_state(self, state: AgentState, config: RunnableConfig):
+    def end_state(self, state: AgentInternalState, config: RunnableConfig):
 
         # this one does not re-enter so will only add instructions once
 

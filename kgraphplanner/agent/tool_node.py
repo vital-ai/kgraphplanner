@@ -1,5 +1,6 @@
 import asyncio
 import json
+import queue
 from copy import copy
 from typing import (
     Any,
@@ -48,10 +49,12 @@ class ToolNode(RunnableCallable):
         name: str = "tools",
         tags: Optional[list[str]] = None,
         handle_tool_errors: Optional[bool] = True,
+        reasoning_queue: queue.Queue = None
     ) -> None:
         super().__init__(self._func, self._afunc, name=name, tags=tags, trace=False)
         self.tools_by_name: Dict[str, BaseTool] = {}
         self.handle_tool_errors = handle_tool_errors
+        self.reasoning_queue = reasoning_queue
         for tool_ in tools:
             if not isinstance(tool_, BaseTool):
                 tool_ = create_tool(tool_)
@@ -85,9 +88,25 @@ class ToolNode(RunnableCallable):
             print(f"Tool Call Invoking: {self.tools_by_name[call['name']]}")
             # print(f"Tool Call Config: {config}")
 
+            tool_name = call['name']
+
+            reasoning_message = {
+                "agent_thought": f"calling tool: {tool_name}"
+            }
+
+            if self.reasoning_queue:
+                self.reasoning_queue.put(reasoning_message)
+
             tool_message: ToolMessage = self.tools_by_name[call["name"]].invoke(
                 input, config
             )
+
+            reasoning_message = {
+                "agent_thought": f"completed calling tool: {tool_name}"
+            }
+
+            if self.reasoning_queue:
+                self.reasoning_queue.put(reasoning_message)
 
             # TODO: handle this properly in core
             tool_message.content = str_output(tool_message.content)
