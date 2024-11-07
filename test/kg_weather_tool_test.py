@@ -4,6 +4,7 @@ from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather
 
 from kgraphplanner.tool_manager.tool_manager import ToolManager
 from kgraphplanner.tool_manager.tool_request import ToolRequest
+from kgraphplanner.tools.weather.current_weather_tool import CurrentWeatherTool
 from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 
 
@@ -12,10 +13,28 @@ def main():
 
     load_dotenv()
 
-    tool_config = {}
+
+    tool_endpoint = "http://localhost:8008"
+
+    tool_config = {
+        "tool_endpoint": tool_endpoint
+    }
+
     tool_manager = ToolManager(tool_config)
 
-    weather_tool = WeatherInfoTool({}, tool_manager=tool_manager)
+    weather_config = {
+        "tool_endpoint": tool_endpoint,
+        "weather_tool": {}
+    }
+
+    current_weather_config = {
+        "tool_endpoint": tool_endpoint,
+        "weather_tool": {}
+    }
+
+    weather_tool = WeatherInfoTool(weather_config, tool_manager=tool_manager)
+
+    current_weather_tool = CurrentWeatherTool(current_weather_config, tool_manager=tool_manager)
 
     # test the handle_request as the get_weather function is wrapped with @tool
     # and should be called from langgraph

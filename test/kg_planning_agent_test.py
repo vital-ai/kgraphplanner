@@ -5,7 +5,8 @@ from rich.console import Console
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from kgraphplanner.agent.kg_planning_base_agent import KGPlanningAgent
+
+from kgraphplanner.agent.kg_planning_agent import KGPlanningAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
 from kgraphplanner.tools.place_search.place_search_tool import PlaceSearchTool

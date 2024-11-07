@@ -7,7 +7,6 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from typing_extensions import TypedDict
-
 from kgraphplanner.agent.kg_planning_structured_agent import KGPlanningStructuredAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
@@ -17,7 +16,8 @@ from kgraphplanner.tools_internal.kgraph_query.search_contacts_tool import Searc
 from kgraphplanner.tools.send_message.send_message_tool import SendMessageTool
 from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 import pprint
-
+import threading
+import queue
 
 def print_stream(stream, messages_out: list = []) -> TypedDict:
 
@@ -25,14 +25,36 @@ def print_stream(stream, messages_out: list = []) -> TypedDict:
 
     final_result = None
 
+    iteration = 0
+
     for s in stream:
-        message = s["messages"][-1]
-        messages_out.append(message)
-        if isinstance(message, tuple):
-            print(message)
+
+        print(s)
+
+        iteration += 1
+
+        messages = s["messages"]
+
+        for m in messages:
+            t = type(m)
+            print(f"Stream {iteration}: History ({t}): {m}")
+
+        final_response = s.get("final_response", None)
+
+        if final_response:
+            print(s)
+            final_result = s
         else:
-            message.pretty_print()
-        final_result = s
+
+            # parallel tools add more than one message,
+            # but this is just adding the last one so it's missing some
+            message = s["messages"][-1]
+            messages_out.append(message)
+            if isinstance(message, tuple):
+                print(message)
+            else:
+                message.pretty_print()
+            # final_result = s
 
     print(final_result)
 
@@ -94,6 +116,26 @@ def case_one(tool_manager, graph):
     # content = f"{get_timestamp()}: what was the weather in LA and Philly on Christmas in 2020?"
 
     # content = f"{get_timestamp()}: what is the weather in Philly?"
+
+
+    # handle prior messages
+    # TODO add in incoming history
+    # chat_message_list = [
+    #    ("system", system_prompt)
+    # ]
+
+    # for h in history_list:
+    #    chat_message_list.append(h)
+
+    # instead of adding them directly, create a single merged HumanMessage
+    # to act as "summary" of prior activity, which would include tool requests/responses
+    # prior tool messages may need the guids to refer to and retrieve from the cache
+    # or retrieve from kg, but hopefully what is in the messages is sufficient.
+    # before we put json of tool replies into history, but that can slow down structured response calls
+    # so potentially convert tool responses to markdown or similar first
+
+    # we'll be returning just the new messages to add to an interaction, so we'll skip this
+    # summary message in our reply
 
     message_input = [
         system_message,
@@ -187,6 +229,26 @@ def case_three(tool_manager, graph):
         print(f"History ({t}): {m}")
 
 
+def reasoning_consumer(message_queue: queue.Queue, stop_event: threading.Event):
+
+    while not stop_event.is_set():
+        try:
+            message = message_queue.get(timeout=0.5)
+            print(f"Consumed: {message}")
+            if message == "STOP":
+                break
+
+            # send back reasoning on websocket in AIMP format
+            # for display in UI
+
+            # messages to include some degree of context of activity
+            # as well as errors, re-starts, changing of mind, etc.
+
+            message_queue.task_done()
+        except queue.Empty:
+            continue
+
+
 def main():
     print("KG Planning Structured Agent Test")
 
@@ -195,6 +257,17 @@ def main():
     rich = Console()
 
     logging_handler = LoggingHandler()
+
+    message_queue = queue.Queue()
+
+    stop_event = threading.Event()
+
+    consumer_thread = threading.Thread(
+        target=reasoning_consumer,
+        args=(message_queue, stop_event),
+        daemon=True)
+
+    consumer_thread.start()
 
     model_tools = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
     model_structured = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
@@ -252,7 +325,13 @@ def main():
 
     memory = MemoryCheckpointer()
 
-    agent = KGPlanningStructuredAgent(model_tools=model_tools, model_structured=model_structured, checkpointer=memory, tools=tool_function_list)
+    agent = KGPlanningStructuredAgent(
+        model_tools=model_tools,
+        model_structured=model_structured,
+        checkpointer=memory,
+        tools=tool_function_list,
+        reasoning_queue=message_queue
+    )
 
     graph = agent.compile()
 
@@ -268,6 +347,11 @@ def main():
     # case_two(tool_manager, graph)
 
     # case_three(tool_manager, graph)
+
+    message_queue.put("STOP")
+
+    stop_event.set()
+    consumer_thread.join()
 
 
 if __name__ == "__main__":

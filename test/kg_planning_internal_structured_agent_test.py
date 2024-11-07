@@ -7,7 +7,6 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from typing_extensions import TypedDict
-from kgraphplanner.agent.kg_planning_base_agent import KGPlanningStructuredAgent
 from kgraphplanner.agent.kg_planning_internal_structured_agent import KGPlanningInternalStructuredAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
