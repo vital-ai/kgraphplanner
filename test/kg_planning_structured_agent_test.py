@@ -1,7 +1,9 @@
 import logging
-from typing import List, Any
+from typing import List, Any, Sequence
 from dotenv import load_dotenv
 from datetime import datetime
+
+from langchain_core.tools import Tool, BaseTool
 from rich.console import Console
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
@@ -19,7 +21,8 @@ import pprint
 import threading
 import queue
 
-def print_stream(stream, messages_out: list = []) -> TypedDict:
+
+def print_stream(stream, messages_out: list) -> TypedDict:
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
@@ -117,7 +120,6 @@ def case_one(tool_manager, graph):
 
     # content = f"{get_timestamp()}: what is the weather in Philly?"
 
-
     # handle prior messages
     # TODO add in incoming history
     # chat_message_list = [
@@ -202,6 +204,7 @@ def case_two(tool_manager, graph):
         t = type(m)
         print(f"History ({t}): {m}")
 
+
 def case_three(tool_manager, graph):
 
     config = {"configurable": {"thread_id": "urn:thread_2"}}
@@ -284,18 +287,22 @@ def main():
         "tool_endpoint": tool_endpoint,
         "place_search_tool": {}
     }
+
     weather_config = {
         "tool_endpoint": tool_endpoint,
         "weather_tool": {}
     }
+
     current_weather_config = {
         "tool_endpoint": tool_endpoint,
         "weather_tool": {}
     }
+
     search_contacts_config = {
         "tool_endpoint": tool_endpoint,
         "search_contacts_tool": {}
     }
+
     send_message_config = {
         "tool_endpoint": tool_endpoint,
         "send_message_tool": {}
@@ -315,7 +322,15 @@ def main():
     tool_function_list = []
 
     for t in tool_manager.get_tool_list():
-        tool_function_list.append(t.get_tool_function())
+
+        tool = Tool(
+            name=t.get_tool_name(),
+            func=t.get_tool_function(),
+            description=t.get_tool_description())
+
+        tool_function_list.append(tool)
+
+    tool_function_seq: Sequence[BaseTool] = tool_function_list
 
     # Note: this isn't used, the ToolNode handles executing tools
     # tool_executor = ToolExecutor(tools=tool_list)
@@ -329,7 +344,7 @@ def main():
         model_tools=model_tools,
         model_structured=model_structured,
         checkpointer=memory,
-        tools=tool_function_list,
+        tools=tool_function_seq,
         reasoning_queue=message_queue
     )
 

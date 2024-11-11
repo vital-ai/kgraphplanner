@@ -7,25 +7,21 @@ from typing import (
     TypeVar,
     Union,
 )
-from typing_extensions import TypedDict
 
 from langchain_core.language_models import LanguageModelLike
 
 from langchain_core.messages import (
     AIMessage,
-    BaseMessage,
-    SystemMessage, HumanMessage, ToolMessage,
+    HumanMessage
 )
-from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
+from langchain_core.runnables import RunnableConfig, RunnableLambda
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, StateGraph, add_messages
+from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
-from langgraph.managed import IsLastStep
 from kgraphplanner.agent.tool_executor import ToolExecutor
 from kgraphplanner.agent.tool_node import ToolNode
 from kgraphplanner.structured_response.agent_status_response import AgentStatusResponse
-from kgraphplanner.structured_response.weather_response import WeatherResponse
 from kgraphplanner.tools_internal.capture.capture_response_tool import CaptureResponseTool
 from kgraphplanner.agent.kg_planning_base_agent import KGPlanningBaseAgent, StateSchemaType, StateModifier, \
     MessagesModifier, AgentState

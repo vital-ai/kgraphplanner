@@ -1,37 +1,18 @@
-from abc import ABC, abstractmethod
 from typing import (
-    Annotated,
-    Callable,
     Optional,
     Sequence,
-    Type,
-    TypeVar,
     Union,
 )
-from typing_extensions import TypedDict
-
 from langchain_core.language_models import LanguageModelLike
-
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    SystemMessage, HumanMessage, ToolMessage,
-)
-from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
+from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
-from langgraph.graph.message import add_messages
-from langgraph.managed import IsLastStep
-
 from kgraphplanner.agent.kg_planning_base_agent import KGPlanningBaseAgent, StateSchemaType, StateModifier, \
     MessagesModifier, AgentState
 from kgraphplanner.agent.tool_executor import ToolExecutor
 from kgraphplanner.agent.tool_node import ToolNode
-from kgraphplanner.structured_response.agent_status_response import AgentStatusResponse
-from kgraphplanner.structured_response.weather_response import WeatherResponse
-from kgraphplanner.tools_internal.capture.capture_response_tool import CaptureResponseTool
 
 
 class KGPlanningAgent(KGPlanningBaseAgent):

@@ -1,7 +1,5 @@
 import pprint
-from typing import Callable, Tuple, List
-
-from kgraphplanner.structured_response.structured_response import StructuredResponse
+from typing import Callable, List
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
@@ -24,8 +22,6 @@ class CaptureResponseTool(AbstractTool):
             :param response_class_name: The name of the response class, which should be a subclass of TypedDict
             :param tool_response_guid_list: a list of GUIDs of the response class
             """
-
-            # :param structured_tool_response: The structured response to be captured
 
             pp = pprint.PrettyPrinter(indent=4, width=40)
 

@@ -8,13 +8,21 @@ from kgraphplanner.tool_manager.tool_response import ToolResponse
 
 
 class AbstractTool(ABC):
-    def __init__(self, config: dict, tool_manager=None, name: str = None):
+    def __init__(self,
+                 config: dict,
+                 tool_manager=None,
+                 name: str = None,
+                 description: str = None):
         self.config = config
         self.tool_manager = tool_manager
         if name:
             self.name = name
         else:
             self.name = self.__class__.__name__
+        if description:
+            self.description = description
+        else:
+            self.description = self.name
         if self.tool_manager:
             from kgraphplanner.tool_manager.tool_manager import ToolManager
             tm: ToolManager = tool_manager
@@ -26,6 +34,9 @@ class AbstractTool(ABC):
 
     def get_tool_name(self) -> str:
         return self.name
+
+    def get_tool_description(self) -> str:
+        return self.description
 
     @abstractmethod
     def handle_request(self, request: ToolRequest) -> ToolResponse:

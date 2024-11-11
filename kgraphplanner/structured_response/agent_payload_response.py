@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Annotated, List
 
 from typing_extensions import TypedDict
 
@@ -6,38 +6,21 @@ from kgraphplanner.structured_response.structured_response import StructuredResp
 
 
 class AgentPayload(TypedDict):
-    """
-    Represents a payload to include in the response to the request.
-    Attributes:
-        payload_class_name (str): The class name, which is a subclass of TypedDict
-        payload_guid (str): The identifier of the data record for this payload
-    """
-    payload_class_name: str
-    payload_guid: str
+    """Represents a payload to include in the response to the request."""
+
+    payload_class_name: Annotated[str, ..., "The class name, which is a subclass of TypedDict."]
+    payload_guid: Annotated[str, ..., "The identifier of the data record for this payload."]
 
 
-class AgentPayloadResponse(StructuredResponse):
-    """
-    Represents the response and status of a request to an A.I. Agent.
-        Attributes:
-            human_text_request (str): Restate the exact initial request of the human
-            agent_text_response (str): generated response to the human request
-            agent_request_status (str): the request status
-                One of:
-                    complete: request is complete
-                    incomplete: request is incomplete and should be continued
-                    missing_input: request is pending due to missing input
-                    error: error occurred, re-try is possible
-                    failure: failure occurred, re-try is not possible
-            agent_payload_list (list[AgentPayload]): list of payloads to include, or empty list
-            agent_request_status_message (str): optional message for why a request is not complete
-            missing_input (str): an optional message for what input is missing, if any
-            response_class_name (str) is AgentPayloadResponse.
-    """
+class AgentPayloadResponse(TypedDict):
+    """Represents the response and status of a request to an A.I. Agent."""
 
-    human_text_request: str
-    agent_text_response: str
-    agent_request_status: str
-    agent_payload_list: list[AgentPayload]
-    agent_request_status_message: Optional[str]
-    missing_input: Optional[str]
+    human_text_request: Annotated[str, ..., "Restate the exact initial request of the human."]
+    agent_text_response: Annotated[str, ..., "Generated response to the human request."]
+    agent_request_status: Annotated[
+        str, ..., "The request status, one of: complete, incomplete, missing_input, error, or failure."]
+    agent_payload_list: Annotated[List[AgentPayload], ..., "List of payloads to include, or an empty list if none."]
+    agent_request_status_message: Annotated[
+        Optional[str], None, "Optional message explaining why a request is not complete."]
+    missing_input: Annotated[Optional[str], None, "Optional message specifying what input is missing, if any."]
+    response_class_name: Annotated[str, ..., "The response class name, which is AgentPayloadResponse."]

@@ -11,18 +11,21 @@ from langchain_core.messages import (
     HumanMessage, ToolMessage,
 )
 from langchain_core.runnables import RunnableConfig, RunnableLambda
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, Tool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from kgraphplanner.agent.tool_executor import ToolExecutor
 from kgraphplanner.agent.tool_node import ToolNode
+from kgraphplanner.inter.base_agent_schema import BaseAgentRequest
+from kgraphplanner.structured_response.agent_call_response import AgentCallResponse, AgentCallCapture
 from kgraphplanner.structured_response.agent_payload_response import AgentPayloadResponse
 from kgraphplanner.agent.kg_planning_base_agent import KGPlanningBaseAgent, StateSchemaType, StateModifier, \
     MessagesModifier, AgentState
+from kgraphplanner.tools_internal.agent.call_agent_tool import CallAgentTool
 
 
-class KGPlanningStructuredAgent(KGPlanningBaseAgent):
+class KGPlanningInterAgent(KGPlanningBaseAgent):
     def __init__(self, *,
                  model_tools: LanguageModelLike,
                  model_structured: LanguageModelLike,
@@ -40,6 +43,17 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
         self.model_structured = model_structured
 
         self.tools = tools
+
+        self.call_agent_tool = CallAgentTool({})
+
+        call_agent_tool = Tool(
+            name=self.call_agent_tool.get_tool_name(),
+            func=self.call_agent_tool.get_tool_function(),
+            description=self.call_agent_tool.get_tool_description())
+
+        self.internal_tools = [
+            call_agent_tool
+        ]
 
         self.reasoning_queue = reasoning_queue
 
@@ -63,12 +77,18 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
             ):
                 raise ValueError(f"Missing required key(s) {missing_keys} in state_schema")
 
+        self.merged_tool_classes = []
+
         if isinstance(self.tools, ToolExecutor):
             self.tool_classes = self.tools.tools
+            self.merged_tool_classes.extend(self.tool_classes)
         else:
             self.tool_classes = self.tools
+            self.merged_tool_classes.extend(self.tool_classes)
 
-        self.model_tools = self.model_tools.bind_tools(self.tool_classes, parallel_tool_calls=True)
+        self.merged_tool_classes.extend(self.internal_tools)
+
+        self.model_tools = self.model_tools.bind_tools(self.merged_tool_classes, parallel_tool_calls=True)
 
         self.preprocessor = self._get_model_preprocessing_runnable(self.state_modifier, self.messages_modifier)
 
@@ -80,14 +100,14 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
 
         self.workflow.add_node("agent", RunnableLambda(self.agent, self.async_agent))
 
-        # self.workflow.add_node("agent", self.agent)
-
         self.workflow.add_node("tools", ToolNode(
-            self.tool_classes,
+            self.merged_tool_classes,
             reasoning_queue=self.reasoning_queue
         ))
 
         self.workflow.add_node("end_state", RunnableLambda(self.end_state))
+
+        self.workflow.add_node("agent_call", RunnableLambda(self.agent_call))
 
         self.workflow.set_entry_point("agent")
 
@@ -96,13 +116,16 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
             self.should_continue,
             {
                 "continue": "tools",
-                "end_state": "end_state"
+                "end_state": "end_state",
+                "agent_call": "agent_call"
             },
         )
 
         self.workflow.add_edge("tools", "agent")
 
         self.workflow.add_edge("end_state", END)
+
+        self.workflow.add_edge("agent_call", END)
 
         self.compiled_state_graph: CompiledGraph = None
 
@@ -130,11 +153,6 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
 
         self.post_to_reasoning_queue(reasoning_message)
 
-        # messages = state["messages"]
-        # for m in messages:
-        #    t = type(m)
-        #    print(f"agent: History ({t}): {m}")
-
         return self.call_model(state, config)
 
     async def async_agent(self, state: AgentState, config: RunnableConfig):
@@ -148,6 +166,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
         return await self.acall_model(state, config)
 
     def should_continue(self, state: AgentState):
+
         messages = state["messages"]
 
         for m in messages:
@@ -155,12 +174,30 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
             print(f"should_continue: History ({t}): {m}")
 
         last_message = messages[-1]
+
         if not last_message.tool_calls:
+
             reasoning_message = {
                 "agent_thought": "completed calling tools."
             }
 
             self.post_to_reasoning_queue(reasoning_message)
+
+            if len(self.call_agent_tool.get_agent_call_list()) > 0:
+
+                reasoning_message = {
+                    "agent_thought": "there are pending agent requests."
+                }
+
+                self.post_to_reasoning_queue(reasoning_message)
+
+                return "agent_call"
+            else:
+                reasoning_message = {
+                    "agent_thought": "there are no pending agent requests."
+                }
+
+                self.post_to_reasoning_queue(reasoning_message)
 
             return "end_state"
         else:
@@ -191,8 +228,8 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
 
     def end_state(self, state: AgentState, config: RunnableConfig):
 
-        print(f"State: {state}")
-        print(f"Config: {config}")
+        # print(f"State: {state}")
+        # print(f"Config: {config}")
 
         messages = state["messages"]
 
@@ -201,11 +238,6 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
         }
 
         self.post_to_reasoning_queue(reasoning_message)
-
-        # decide if we should try to extract payloads or not
-        # if no tool calls, then no need
-        # certain tool cases might be skipped or be a one-to-one
-        # mapping with always including in payload, in which case we don't need the LLM call
 
         determine_payloads = True  # False
 
@@ -287,7 +319,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
 
         internal_instructions = f"""
 (internal instructions)
-        
+
             The available payload response classes are:
 {structured_response_bullet_list}
 
@@ -313,8 +345,8 @@ Previous Messages:
 {internal_instructions}
 """
 
-        print("Instruction Text:")
-        print(instruction_text)
+        # print("Instruction Text:")
+        # print(instruction_text)
 
         instructions = HumanMessage(content=instruction_text)
 
@@ -324,17 +356,10 @@ Previous Messages:
 
         self.post_to_reasoning_queue(reasoning_message)
 
-        # this is bound to AgentStatusResponse but could use a
-        # different model with different structured output
         response = self.model_structured_bound.invoke(
             [instructions]
         )
 
-        # print(f"Final_Response:\n{response}")
-        # Response is structured AgentStatusResponse
-
-        # append the instructions but not the full summary of the history
-        # as that would be redundant
         instructions_message = HumanMessage(content=internal_instructions)
 
         new_messages = []
@@ -352,3 +377,45 @@ Previous Messages:
         self.post_to_reasoning_queue(reasoning_message)
 
         return {"final_response": response}
+
+    def agent_call(self, state: AgentState, config: RunnableConfig):
+
+        messages = state["messages"]
+
+        reasoning_message = {
+            "agent_thought": "composing agent call final response"
+        }
+
+        self.post_to_reasoning_queue(reasoning_message)
+
+        capture_list = self.call_agent_tool.get_agent_call_list()
+
+        agent_call_list = []
+
+        for capture in capture_list:
+            agent_call_guid: str|None = capture.get('guid', None)
+            agent_request: BaseAgentRequest|None = capture.get('agent_request', None)
+
+            agent_call_capture = AgentCallCapture(
+                agent_call_guid=agent_call_guid,
+                agent_request=agent_request
+            )
+
+            agent_call_list.append(agent_call_capture)
+
+        agent_call_response = AgentCallResponse(
+            response_class_name="AgentCallResponse",
+            agent_call_list=agent_call_list,
+        )
+
+        reasoning_message = {
+            "agent_thought": "sending agent call final response."
+        }
+
+        self.post_to_reasoning_queue(reasoning_message)
+
+        return {
+            "final_response": agent_call_response
+        }
+
+

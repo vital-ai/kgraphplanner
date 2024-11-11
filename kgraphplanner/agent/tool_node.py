@@ -60,6 +60,25 @@ class ToolNode(RunnableCallable):
                 tool_ = create_tool(tool_)
             self.tools_by_name[tool_.name] = tool_
 
+    # def convert_input(self, input_dict):
+    #     def recursive_convert(d):
+    #         for key, value in d.items():
+    #             if isinstance(value, str):
+    #                 try:
+    #                     parsed_value = json.loads(value)
+    #                     if isinstance(parsed_value, dict):
+    #                         if "request_class_name" in parsed_value:
+    #                             d[key] = {"agent_request": parsed_value}
+    #                         else:
+    #                             d[key] = recursive_convert(parsed_value)
+    #                 except json.JSONDecodeError:
+    #                     pass
+    #             elif isinstance(value, dict):
+    #                 d[key] = recursive_convert(value)
+    #         return d
+    #
+    #     return recursive_convert(input_dict)
+
     def _func(
         self, input: Union[list[AnyMessage], dict[str, Any]], config: RunnableConfig
     ) -> Any:
@@ -85,8 +104,33 @@ class ToolNode(RunnableCallable):
         try:
             input = {**call, **{"type": "tool_call"}}
 
+            # input_updated = self.convert_input(input)
+
             print(f"Tool Call Invoking: {self.tools_by_name[call['name']]}")
             # print(f"Tool Call Config: {config}")
+
+            print(f"Tool Call Invoking Input: {input}")
+
+            input_tool_name = input.get("name", None)
+
+            ############################################################
+            # Temp work-around until tool calling schema issue resolved
+            if input_tool_name == "CallAgentTool":
+                input_args: dict =input.get("args", None)
+
+                if input_args:
+                    arg1_value = input_args.get("__arg1", None)
+
+                    if arg1_value is not None and type(arg1_value) is str:
+                        arg1_dict = json.loads(arg1_value)
+                        input_args["__arg1"] = {"agent_request": arg1_dict}
+
+                    if arg1_value is not None and type(arg1_value) is dict:
+                        input_args["__arg1"] = {"agent_request": arg1_value}
+
+            print(f"Tool Call Invoking Updated Input: {input}")
+
+            ############################################################
 
             tool_name = call['name']
 
@@ -123,6 +167,8 @@ class ToolNode(RunnableCallable):
         try:
             input = {**call, **{"type": "tool_call"}}
 
+            # input_updated = self.convert_input(input)
+
             print(f"Async Tool Call Invoking: {self.tools_by_name[call['name']]}")
 
             tool_message: ToolMessage = await self.tools_by_name[call["name"]].ainvoke(
@@ -151,6 +197,8 @@ class ToolNode(RunnableCallable):
 
         if not isinstance(message, AIMessage):
             raise ValueError("Last message is not an AIMessage")
+
+        print(f"Parse Input: {input}")
 
         tool_calls = [
             self._inject_state(call, input)

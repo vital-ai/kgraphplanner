@@ -16,16 +16,15 @@ from langchain_core.messages import (
     ToolCall,
     ToolMessage,
 )
-from langchain_core.pydantic_v1 import BaseModel, ValidationError
+# from langchain_core.pydantic_v1 import BaseModel, ValidationError
+
 from langchain_core.runnables import (
     RunnableConfig,
 )
 from langchain_core.runnables.config import get_executor_for_config
 from langchain_core.tools import BaseTool, create_schema_from_function
 from langgraph.utils.runnable import RunnableCallable
-from pydantic import BaseModel as BaseModelV2
-from pydantic import ValidationError as ValidationErrorV2
-
+from pydantic import BaseModel, ValidationError
 
 
 def _default_format_error(
@@ -58,7 +57,7 @@ class ValidationNode(RunnableCallable):
                     )
                 self.schemas_by_name[schema.name] = schema.args_schema
             elif isinstance(schema, type) and issubclass(
-                schema, (BaseModel, BaseModelV2)
+                schema, BaseModel
             ):
                 self.schemas_by_name[schema.__name__] = cast(Type[BaseModel], schema)
             elif callable(schema):
@@ -100,7 +99,7 @@ class ValidationNode(RunnableCallable):
                     name=call["name"],
                     tool_call_id=cast(str, call["id"]),
                 )
-            except (ValidationError, ValidationErrorV2) as e:
+            except ValidationError as e:
                 return ToolMessage(
                     content=self._format_error(e, call, schema),
                     name=call["name"],
