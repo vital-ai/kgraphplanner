@@ -49,7 +49,7 @@ class ToolNode(RunnableCallable):
         name: str = "tools",
         tags: Optional[list[str]] = None,
         handle_tool_errors: Optional[bool] = True,
-        reasoning_queue: queue.Queue = None
+        reasoning_queue: asyncio.Queue = None
     ) -> None:
         super().__init__(self._func, self._afunc, name=name, tags=tags, trace=False)
         self.tools_by_name: Dict[str, BaseTool] = {}
@@ -138,8 +138,8 @@ class ToolNode(RunnableCallable):
                 "agent_thought": f"calling tool: {tool_name}"
             }
 
-            if self.reasoning_queue:
-                self.reasoning_queue.put(reasoning_message)
+            # if self.reasoning_queue:
+            #    await self.reasoning_queue.put(reasoning_message)
 
             tool_message: ToolMessage = self.tools_by_name[call["name"]].invoke(
                 input, config
@@ -149,8 +149,8 @@ class ToolNode(RunnableCallable):
                 "agent_thought": f"completed calling tool: {tool_name}"
             }
 
-            if self.reasoning_queue:
-                self.reasoning_queue.put(reasoning_message)
+            # if self.reasoning_queue:
+            #   await  self.reasoning_queue.put(reasoning_message)
 
             # TODO: handle this properly in core
             tool_message.content = str_output(tool_message.content)
@@ -174,6 +174,48 @@ class ToolNode(RunnableCallable):
             tool_message: ToolMessage = await self.tools_by_name[call["name"]].ainvoke(
                 input, config
             )
+
+            input_tool_name = input.get("name", None)
+
+            ############################################################
+            # Temp work-around until tool calling schema issue resolved
+            if input_tool_name == "CallAgentTool":
+                input_args: dict = input.get("args", None)
+
+                if input_args:
+                    arg1_value = input_args.get("__arg1", None)
+
+                    if arg1_value is not None and type(arg1_value) is str:
+                        arg1_dict = json.loads(arg1_value)
+                        input_args["__arg1"] = {"agent_request": arg1_dict}
+
+                    if arg1_value is not None and type(arg1_value) is dict:
+                        input_args["__arg1"] = {"agent_request": arg1_value}
+
+            print(f"Tool Call Invoking Updated Input: {input}")
+
+            ############################################################
+
+            tool_name = call['name']
+
+            reasoning_message = {
+                "agent_thought": f"calling tool: {tool_name}"
+            }
+
+            if self.reasoning_queue:
+                await self.reasoning_queue.put(reasoning_message)
+
+            tool_message: ToolMessage = self.tools_by_name[call["name"]].invoke(
+                input, config
+            )
+
+            reasoning_message = {
+                "agent_thought": f"completed calling tool: {tool_name}"
+            }
+
+            if self.reasoning_queue:
+                await self.reasoning_queue.put(reasoning_message)
+
             # TODO: handle this properly in core
             tool_message.content = str_output(tool_message.content)
             return tool_message

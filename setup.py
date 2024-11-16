@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='kgraphplanner',
-    version='0.0.9',
+    version='0.0.10',
     author='Marc Hadfield',
     author_email='marc@vital.ai',
     description='KGraph Planner',
