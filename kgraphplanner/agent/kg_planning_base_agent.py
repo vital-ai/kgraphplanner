@@ -56,7 +56,6 @@ class KGPlanningBaseAgent(ABC):
         self.model_runnable = None
         self.reasoning_queue = None
 
-
     def _convert_messages_modifier_to_state_modifier(self,
                                                      messages_modifier: MessagesModifier
                                                      ) -> StateModifier:

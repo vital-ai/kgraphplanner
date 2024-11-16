@@ -1,8 +1,8 @@
+import asyncio
 import logging
 from typing import List, Any, Sequence
 from dotenv import load_dotenv
 from datetime import datetime
-
 from langchain_core.tools import Tool, BaseTool
 from rich.console import Console
 from langchain.callbacks.base import BaseCallbackHandler
@@ -18,11 +18,9 @@ from kgraphplanner.tools_internal.kgraph_query.search_contacts_tool import Searc
 from kgraphplanner.tools.send_message.send_message_tool import SendMessageTool
 from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 import pprint
-import threading
-import queue
 
 
-def print_stream(stream, messages_out: list) -> TypedDict:
+async def print_stream(stream, messages_out: list) -> TypedDict:
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
@@ -30,7 +28,7 @@ def print_stream(stream, messages_out: list) -> TypedDict:
 
     iteration = 0
 
-    for s in stream:
+    async for s in stream:
 
         print(s)
 
@@ -104,7 +102,7 @@ system_message_content = """
     """
 
 
-def case_one(tool_manager, graph):
+async def case_one(tool_manager, graph):
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
@@ -148,7 +146,7 @@ def case_one(tool_manager, graph):
 
     messages_out = []
 
-    agent_status_response = print_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
+    agent_status_response = await print_stream(graph.astream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)
@@ -232,11 +230,11 @@ def case_three(tool_manager, graph):
         print(f"History ({t}): {m}")
 
 
-def reasoning_consumer(message_queue: queue.Queue, stop_event: threading.Event):
+async def reasoning_consumer(message_queue: asyncio.Queue, stop_event: asyncio.Event):
 
     while not stop_event.is_set():
         try:
-            message = message_queue.get(timeout=0.5)
+            message = await asyncio.wait_for(message_queue.get(), timeout=0.5)
             print(f"Consumed: {message}")
             if message == "STOP":
                 break
@@ -248,11 +246,13 @@ def reasoning_consumer(message_queue: queue.Queue, stop_event: threading.Event):
             # as well as errors, re-starts, changing of mind, etc.
 
             message_queue.task_done()
-        except queue.Empty:
+        except asyncio.TimeoutError:
+            # Allow WebSocket to deliver messages or wait briefly
+            await asyncio.sleep(0.01)
             continue
 
 
-def main():
+async def main():
     print("KG Planning Structured Agent Test")
 
     load_dotenv()
@@ -261,16 +261,11 @@ def main():
 
     logging_handler = LoggingHandler()
 
-    message_queue = queue.Queue()
+    message_queue = asyncio.Queue()
 
-    stop_event = threading.Event()
+    stop_event = asyncio.Event()
 
-    consumer_thread = threading.Thread(
-        target=reasoning_consumer,
-        args=(message_queue, stop_event),
-        daemon=True)
-
-    consumer_thread.start()
+    consumer_task = asyncio.create_task(reasoning_consumer(message_queue, stop_event))
 
     model_tools = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
     model_structured = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
@@ -357,17 +352,17 @@ def main():
 
     # os.system('open output_image.png')
 
-    case_one(tool_manager, graph)
+    await case_one(tool_manager, graph)
 
     # case_two(tool_manager, graph)
 
     # case_three(tool_manager, graph)
 
-    message_queue.put("STOP")
+    await message_queue.put("STOP")
 
     stop_event.set()
-    consumer_thread.join()
+    await consumer_task
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

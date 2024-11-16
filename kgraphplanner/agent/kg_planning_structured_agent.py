@@ -1,5 +1,5 @@
+import asyncio
 import json
-import queue
 from typing import (
     Optional,
     Sequence,
@@ -27,7 +27,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
                  model_tools: LanguageModelLike,
                  model_structured: LanguageModelLike,
                  tools: Union[ToolExecutor, Sequence[BaseTool]],
-                 reasoning_queue: queue.Queue = None,
+                 reasoning_queue: asyncio.Queue = None,
                  state_schema: Optional[StateSchemaType] = None, messages_modifier: Optional[MessagesModifier] = None,
                  state_modifier: Optional[StateModifier] = None, checkpointer: Optional[BaseCheckpointSaver] = None,
                  interrupt_before: Optional[Sequence[str]] = None, interrupt_after: Optional[Sequence[str]] = None,
@@ -119,8 +119,8 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
 
         return self.compiled_state_graph
 
-    def post_to_reasoning_queue(self, message: dict):
-        self.reasoning_queue.put(message)
+    async def post_to_reasoning_queue(self, message: dict):
+        await self.reasoning_queue.put(message)
 
     def agent(self, state: AgentState, config: RunnableConfig):
 
@@ -128,7 +128,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
             "agent_thought": "calling model"
         }
 
-        self.post_to_reasoning_queue(reasoning_message)
+        # await self.post_to_reasoning_queue(reasoning_message)
 
         # messages = state["messages"]
         # for m in messages:
@@ -143,11 +143,17 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
             "agent_thought": "calling model"
         }
 
-        self.post_to_reasoning_queue(reasoning_message)
+        await self.post_to_reasoning_queue(reasoning_message)
+
+        # messages = state["messages"]
+        # for m in messages:
+        #    t = type(m)
+        #    print(f"agent: History ({t}): {m}")
 
         return await self.acall_model(state, config)
 
-    def should_continue(self, state: AgentState):
+
+    async def should_continue(self, state: AgentState):
         messages = state["messages"]
 
         for m in messages:
@@ -160,7 +166,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
                 "agent_thought": "completed calling tools."
             }
 
-            self.post_to_reasoning_queue(reasoning_message)
+            await self.post_to_reasoning_queue(reasoning_message)
 
             return "end_state"
         else:
@@ -168,7 +174,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
                 "agent_thought": "deciding to continue calling tools."
             }
 
-            self.post_to_reasoning_queue(reasoning_message)
+            await self.post_to_reasoning_queue(reasoning_message)
 
             return "continue"
 
@@ -189,7 +195,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
                 text += "  " * indent + f"{key}: {value}\n"
         return text
 
-    def end_state(self, state: AgentState, config: RunnableConfig):
+    async def end_state(self, state: AgentState, config: RunnableConfig):
 
         print(f"State: {state}")
         print(f"Config: {config}")
@@ -200,7 +206,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
             "agent_thought": "composing final response"
         }
 
-        self.post_to_reasoning_queue(reasoning_message)
+        await self.post_to_reasoning_queue(reasoning_message)
 
         # decide if we should try to extract payloads or not
         # if no tool calls, then no need
@@ -231,7 +237,7 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
                 "agent_thought": "sending final response."
             }
 
-            self.post_to_reasoning_queue(reasoning_message)
+            await self.post_to_reasoning_queue(reasoning_message)
 
             agent_payload_response = AgentPayloadResponse(
                 human_text_request=human_text,
@@ -322,11 +328,11 @@ Previous Messages:
             "agent_thought": "deciding final response payloads."
         }
 
-        self.post_to_reasoning_queue(reasoning_message)
+        await self.post_to_reasoning_queue(reasoning_message)
 
         # this is bound to AgentStatusResponse but could use a
         # different model with different structured output
-        response = self.model_structured_bound.invoke(
+        response = await self.model_structured_bound.ainvoke(
             [instructions]
         )
 
@@ -349,6 +355,6 @@ Previous Messages:
             "agent_thought": "sending final response."
         }
 
-        self.post_to_reasoning_queue(reasoning_message)
+        await self.post_to_reasoning_queue(reasoning_message)
 
         return {"final_response": response}
