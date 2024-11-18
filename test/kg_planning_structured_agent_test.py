@@ -176,6 +176,48 @@ async def case_one(tool_manager, graph):
         print(f"Agent Class Name: {payload_class_name}")
         print("--------------------------------------")
 
+    content_two = f"{get_timestamp()}: thanks!"
+
+    message_input = [
+        system_message,
+        HumanMessage(content=content),
+        AIMessage(content=agent_text_response),
+        HumanMessage(content=content_two)
+    ]
+
+    inputs = {"messages": message_input}
+
+    messages_out = []
+
+    agent_status_response = await print_stream(graph.astream(inputs, config, stream_mode="values"), messages_out)
+
+    for m in messages_out:
+        t = type(m)
+        print(f"History ({t}): {m}")
+
+    human_text_request = agent_status_response.get("human_text_request", None)
+    agent_text_response = agent_status_response.get("agent_text_response", None)
+    agent_request_status = agent_status_response.get("agent_request_status", None)
+    agent_payload_list = agent_status_response.get("agent_payload_list", [])
+    agent_request_status_message = agent_status_response.get("agent_request_status_message", None)
+    missing_input = agent_status_response.get("missing_input", None)
+
+    print(f"Status: {agent_request_status}")
+
+    print(f"Human Text: {human_text_request}")
+    print(f"Agent Text: {agent_text_response}")
+
+    for agent_payload in agent_payload_list:
+        pp.pprint(agent_payload)
+
+        payload_class_name = agent_payload.get("payload_class_name", None)
+        payload_guid = agent_payload.get("payload_guid", None)
+
+        print("--------------------------------------")
+        print(f"Agent GUID: {payload_guid}")
+        print(f"Agent Class Name: {payload_class_name}")
+        print("--------------------------------------")
+
 
 def case_two(tool_manager, graph):
 

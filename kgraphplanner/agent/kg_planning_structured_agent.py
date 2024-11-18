@@ -304,8 +304,8 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
 
             You fill out the fields of AgentPayloadResponse based on the previous messages.
 
-            human_text_request: This should be the initial request from the human  
-            agent_text_response: This should be the text of the response to the initial request. 
+            human_text_request: This should be the current request from the human  
+            agent_text_response: This should be the text of the response to the current request. 
             agent_request_status: this status of the initial request
             agent_payload_list: this should be the list of payloads to include in the response, if any.
             agent_request_status_message: an optional message used if the status is not complete to explain why
