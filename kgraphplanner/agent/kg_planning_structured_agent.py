@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from typing import (
     Optional,
     Sequence,
@@ -63,10 +64,24 @@ class KGPlanningStructuredAgent(KGPlanningBaseAgent):
             ):
                 raise ValueError(f"Missing required key(s) {missing_keys} in state_schema")
 
-        if isinstance(self.tools, ToolExecutor):
-            self.tool_classes = self.tools.tools
-        else:
-            self.tool_classes = self.tools
+        # if isinstance(self.tools, ToolExecutor):
+        #    self.tool_classes = self.tools.tools
+        #else:
+
+        self.tool_classes = self.tools
+
+        logger = logging.getLogger("HaleyAgentLogger")
+
+        for tool_class in self.tool_classes:
+            logger.info(f"Tool: {tool_class}")
+
+            if hasattr(tool_class.args_schema, "schema_json"):
+                logger.info(f"Tool Args Schema JSON: {tool_class.args_schema.schema_json(indent=2)}")
+            else:
+                logger.info("Schema JSON not available for args_schema.")
+
+
+            # logger.info(f"Schema: {tool_class.tool.schema if hasattr(tool_class, 'tool') else 'No schema available'}")
 
         self.model_tools = self.model_tools.bind_tools(self.tool_classes, parallel_tool_calls=True)
 

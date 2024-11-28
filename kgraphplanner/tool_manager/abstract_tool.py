@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Type
+
+from pydantic import BaseModel
+
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
 
@@ -44,6 +47,10 @@ class AbstractTool(ABC):
 
     @abstractmethod
     def get_tool_function(self) -> Callable:
+        pass
+
+    @abstractmethod
+    def get_tool_schema(self) -> Type[BaseModel]:
         pass
 
     def get_generic_text(self) -> str:

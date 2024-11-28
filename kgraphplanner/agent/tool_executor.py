@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable, Sequence, Union
 from langchain_core.load.serializable import Serializable
 from langchain_core.runnables import RunnableConfig
@@ -40,7 +41,8 @@ class ToolExecutor(RunnableCallable):
     def _execute(
         self, tool_invocation: ToolInvocationInterface, config: RunnableConfig
     ) -> Any:
-        print(f"Tool Execute Invoked")
+        logger = logging.getLogger("HaleyAgentLogger")
+        logger.info(f"Tool Execute Invoked")
         if tool_invocation.tool not in self.tool_map:
             return self.invalid_tool_msg_template.format(
                 requested_tool_name=tool_invocation.tool,
@@ -54,7 +56,8 @@ class ToolExecutor(RunnableCallable):
     async def _aexecute(
         self, tool_invocation: ToolInvocationInterface, config: RunnableConfig
     ) -> Any:
-        print(f"Async Tool Execute Invoked")
+        logger = logging.getLogger("HaleyAgentLogger")
+        logger.info(f"Async Tool Execute Invoked")
         if tool_invocation.tool not in self.tool_map:
             return self.invalid_tool_msg_template.format(
                 requested_tool_name=tool_invocation.tool,
@@ -62,5 +65,7 @@ class ToolExecutor(RunnableCallable):
             )
         else:
             tool = self.tool_map[tool_invocation.tool]
+
+            logger.info(f"Async Tool Execute Invoked Input: {tool_invocation.tool_input}")
             output = await tool.ainvoke(tool_invocation.tool_input, config)
             return output

@@ -16,7 +16,6 @@ from langchain_core.messages import (
     ToolCall,
     ToolMessage,
 )
-# from langchain_core.pydantic_v1 import BaseModel, ValidationError
 
 from langchain_core.runnables import (
     RunnableConfig,
@@ -90,12 +89,18 @@ class ValidationNode(RunnableCallable):
         """Validate and run tool calls synchronously."""
         output_type, message = self._get_message(input)
 
-        def run_one(call: ToolCall):
+        def run_one(call: ToolCall) -> ToolMessage:
             schema = self.schemas_by_name[call["name"]]
             try:
-                output = schema.validate(call["args"])
+                if issubclass(schema, BaseModel):
+                    output = schema.model_validate(call["args"])
+                    content = output.model_dump_json()
+                else:
+                    raise ValueError(
+                        f"Unsupported schema type: {type(schema)}. Expected BaseModel or BaseModelV1."
+                    )
                 return ToolMessage(
-                    content=output.json(),
+                    content=content,
                     name=call["name"],
                     tool_call_id=cast(str, call["id"]),
                 )
@@ -113,4 +118,3 @@ class ValidationNode(RunnableCallable):
                 return outputs
             else:
                 return {"messages": outputs}
-

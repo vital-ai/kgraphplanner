@@ -21,7 +21,7 @@ import threading
 import queue
 
 
-def print_stream(stream, messages_out: list) -> TypedDict:
+def process_stream(stream, messages_out: list) -> TypedDict:
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
@@ -224,7 +224,7 @@ def case_one(tool_manager, graph):
 
     messages_out = []
 
-    agent_status_response = print_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
+    agent_status_response = process_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)

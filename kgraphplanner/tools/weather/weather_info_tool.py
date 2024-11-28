@@ -1,12 +1,11 @@
-from typing import Callable
-
+from typing import Callable, Optional, Type
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather_request import WeatherRequest
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather_response import WeatherResponse, \
     WeatherData
 from vital_agent_kg_utils.vital_agent_rest_resource_client.vital_agent_rest_resource_client import \
     VitalAgentRestResourceClient
-
 from kgraphplanner.tool_manager.tool_cache import ToolCache
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
@@ -19,8 +18,14 @@ class WeatherReport(TypedDict):
     # friendly version of WeatherData ?
 
 
-# TODO: variant that includes place name instead of lat, long and internally
-# does the lat, long lookup.  this would have one tool call instead of two.
+class WeatherParams(BaseModel):
+    place_label: str = Field(..., description="The place label of the weather location.")
+    latitude: float = Field(..., description="The latitude of the weather location.")
+    longitude: float = Field(..., description="The longitude of the weather location.")
+    include_previous: bool = Field(False, description="Include the previous 10 days' weather data.")
+    use_archive: bool = Field(False, description="Use the archive for historical data.")
+    archive_date: str = Field(None, description="The specific date for historical data in 'YYYY-MM-DD' format.")
+
 
 class WeatherInfoTool(AbstractTool):
 
@@ -66,30 +71,23 @@ class WeatherInfoTool(AbstractTool):
     def get_sample_text(self) -> str:
         pass
 
+    def get_tool_schema(self) -> Type[BaseModel]:
+        return WeatherParams
+
     def get_tool_function(self) -> Callable:
 
-        @tool
+        @tool("weather-info-tool", args_schema=WeatherParams, return_direct=True)
         def get_weather(
-                place_label: str,
-                latitude: float,
-                longitude: float,
-                include_previous: bool = False,
-                use_archive: bool = False,
-                archive_date: str = "") -> WeatherData:
+            place_label: str,
+            latitude: float,
+            longitude: float,
+            include_previous: Optional[bool] = False,
+            use_archive: Optional[bool] = False,
+            archive_date: Optional[str] = None
+        ) -> WeatherData:
             """
-            Use this to get weather information for today and the next few days.
-            If you set include_previous to True, you can get the last 10 days worth of data.
-            If you want the weather for a date older than 10 days ago, then and only then use the archive.
-
-                Attributes:
-                    place_label (str): The place label of the weather location.
-                    latitude (float)
-                    longitude (float)
-                    include_previous (bool): include the previous 10 days weather data also
-                    use_archive (bool): instead of the current weather, use the archive for historical data
-                    archive_date (str): if archive is True, the specific date to use for historical data in format YYYY-MM-DD
+            Get current and historical weather information for a specified location.
             """
-
             params = {
                 'place_label': place_label,
                 'latitude': latitude,

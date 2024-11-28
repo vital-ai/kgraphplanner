@@ -1,9 +1,9 @@
 import asyncio
 import logging
-from typing import List, Any, Sequence
+from typing import List, Any, Sequence, Callable
 from dotenv import load_dotenv
 from datetime import datetime
-from langchain_core.tools import Tool, BaseTool
+from langchain_core.tools import Tool, BaseTool, StructuredTool
 from rich.console import Console
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
@@ -20,7 +20,9 @@ from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 import pprint
 
 
-async def print_stream(stream, messages_out: list) -> TypedDict:
+async def process_stream(stream, messages_out: list) -> TypedDict:
+
+    logger = logging.getLogger("HaleyAgentLogger")
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
@@ -30,7 +32,7 @@ async def print_stream(stream, messages_out: list) -> TypedDict:
 
     async for s in stream:
 
-        print(s)
+        logger.info(s)
 
         iteration += 1
 
@@ -38,12 +40,12 @@ async def print_stream(stream, messages_out: list) -> TypedDict:
 
         for m in messages:
             t = type(m)
-            print(f"Stream {iteration}: History ({t}): {m}")
+            logger.info(f"Stream {iteration}: History ({t}): {m}")
 
         final_response = s.get("final_response", None)
 
         if final_response:
-            print(s)
+            logger.info(s)
             final_result = s
         else:
 
@@ -52,19 +54,19 @@ async def print_stream(stream, messages_out: list) -> TypedDict:
             message = s["messages"][-1]
             messages_out.append(message)
             if isinstance(message, tuple):
-                print(message)
+                logger.info(message)
             else:
                 message.pretty_print()
             # final_result = s
 
-    print(final_result)
+    logger.info(final_result)
 
     response = final_result.get("final_response", None)
 
-    print("Final_Result:\n")
-    print("--------------------------------------")
-    pp.pprint(response)
-    print("--------------------------------------")
+    logger.info("Final_Result:\n")
+    logger.info("--------------------------------------")
+    logger.info(pp.pformat(response))
+    logger.info("--------------------------------------")
     return response
 
 
@@ -103,6 +105,8 @@ system_message_content = """
 
 
 async def case_one(tool_manager, graph):
+
+    logger = logging.getLogger("HaleyAgentLogger")
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
@@ -146,11 +150,11 @@ async def case_one(tool_manager, graph):
 
     messages_out = []
 
-    agent_status_response = await print_stream(graph.astream(inputs, config, stream_mode="values"), messages_out)
+    agent_status_response = await process_stream(graph.astream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)
-        print(f"History ({t}): {m}")
+        logger.info(f"History ({t}): {m}")
 
     human_text_request = agent_status_response.get("human_text_request", None)
     agent_text_response = agent_status_response.get("agent_text_response", None)
@@ -159,10 +163,10 @@ async def case_one(tool_manager, graph):
     agent_request_status_message = agent_status_response.get("agent_request_status_message", None)
     missing_input = agent_status_response.get("missing_input", None)
 
-    print(f"Status: {agent_request_status}")
+    logger.info(f"Status: {agent_request_status}")
 
-    print(f"Human Text: {human_text_request}")
-    print(f"Agent Text: {agent_text_response}")
+    logger.info(f"Human Text: {human_text_request}")
+    logger.info(f"Agent Text: {agent_text_response}")
 
     for agent_payload in agent_payload_list:
 
@@ -171,10 +175,10 @@ async def case_one(tool_manager, graph):
         payload_class_name = agent_payload.get("payload_class_name", None)
         payload_guid = agent_payload.get("payload_guid", None)
 
-        print("--------------------------------------")
-        print(f"Agent GUID: {payload_guid}")
-        print(f"Agent Class Name: {payload_class_name}")
-        print("--------------------------------------")
+        logger.info("--------------------------------------")
+        logger.info(f"Agent GUID: {payload_guid}")
+        logger.info(f"Agent Class Name: {payload_class_name}")
+        logger.info("--------------------------------------")
 
     content_two = f"{get_timestamp()}: thanks!"
 
@@ -189,11 +193,11 @@ async def case_one(tool_manager, graph):
 
     messages_out = []
 
-    agent_status_response = await print_stream(graph.astream(inputs, config, stream_mode="values"), messages_out)
+    agent_status_response = await process_stream(graph.astream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)
-        print(f"History ({t}): {m}")
+        logger.info(f"History ({t}): {m}")
 
     human_text_request = agent_status_response.get("human_text_request", None)
     agent_text_response = agent_status_response.get("agent_text_response", None)
@@ -202,10 +206,10 @@ async def case_one(tool_manager, graph):
     agent_request_status_message = agent_status_response.get("agent_request_status_message", None)
     missing_input = agent_status_response.get("missing_input", None)
 
-    print(f"Status: {agent_request_status}")
+    logger.info(f"Status: {agent_request_status}")
 
-    print(f"Human Text: {human_text_request}")
-    print(f"Agent Text: {agent_text_response}")
+    logger.info(f"Human Text: {human_text_request}")
+    logger.info(f"Agent Text: {agent_text_response}")
 
     for agent_payload in agent_payload_list:
         pp.pprint(agent_payload)
@@ -213,10 +217,10 @@ async def case_one(tool_manager, graph):
         payload_class_name = agent_payload.get("payload_class_name", None)
         payload_guid = agent_payload.get("payload_guid", None)
 
-        print("--------------------------------------")
-        print(f"Agent GUID: {payload_guid}")
-        print(f"Agent Class Name: {payload_class_name}")
-        print("--------------------------------------")
+        logger.info("--------------------------------------")
+        logger.info(f"Agent GUID: {payload_guid}")
+        logger.info(f"Agent Class Name: {payload_class_name}")
+        logger.info("--------------------------------------")
 
 
 def case_two(tool_manager, graph):
@@ -238,7 +242,7 @@ def case_two(tool_manager, graph):
 
     messages_out = []
 
-    print_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
+    process_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)
@@ -246,6 +250,8 @@ def case_two(tool_manager, graph):
 
 
 def case_three(tool_manager, graph):
+
+    logger = logging.getLogger("HaleyAgentLogger")
 
     config = {"configurable": {"thread_id": "urn:thread_2"}}
 
@@ -265,19 +271,21 @@ def case_three(tool_manager, graph):
 
     messages_out = []
 
-    print_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
+    process_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)
-        print(f"History ({t}): {m}")
+        logger.info(f"History ({t}): {m}")
 
 
 async def reasoning_consumer(message_queue: asyncio.Queue, stop_event: asyncio.Event):
 
+    logger = logging.getLogger("HaleyAgentLogger")
+
     while not stop_event.is_set():
         try:
             message = await asyncio.wait_for(message_queue.get(), timeout=0.5)
-            print(f"Consumed: {message}")
+            logger.info(f"Consumed: {message}")
             if message == "STOP":
                 break
 
@@ -295,7 +303,6 @@ async def reasoning_consumer(message_queue: asyncio.Queue, stop_event: asyncio.E
 
 
 async def main():
-    print("KG Planning Structured Agent Test")
 
     load_dotenv()
 
@@ -303,14 +310,21 @@ async def main():
 
     logging_handler = LoggingHandler()
 
+    logging.basicConfig(level=logging.INFO)
+
+    logger = logging.getLogger("HaleyAgentLogger")
+
+    logger.info("KG Planning Structured Agent Test")
+
     message_queue = asyncio.Queue()
 
     stop_event = asyncio.Event()
 
     consumer_task = asyncio.create_task(reasoning_consumer(message_queue, stop_event))
 
-    model_tools = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
-    model_structured = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
+    model_tools = ChatOpenAI(model_name="gpt-4o", callbacks=[logging_handler], temperature=0)
+
+    model_structured = ChatOpenAI(model_name="gpt-4o", callbacks=[logging_handler], temperature=0)
 
     tool_endpoint = "http://localhost:8008"
 
@@ -351,21 +365,18 @@ async def main():
 
     current_weather_tool = CurrentWeatherTool(current_weather_config,  tool_manager=tool_manager)
 
-    search_contacts_tool = SearchContactsTool(search_contacts_config,  tool_manager=tool_manager)
+    # search_contacts_tool = SearchContactsTool(search_contacts_config,  tool_manager=tool_manager)
 
-    send_message_tool = SendMessageTool(send_message_config,  tool_manager=tool_manager)
+    # send_message_tool = SendMessageTool(send_message_config,  tool_manager=tool_manager)
 
     # getting tools to use in agent into a function list
-    tool_function_list = []
+    tool_function_list:List[Callable] = []
+
+    logger.info("defining tools")
 
     for t in tool_manager.get_tool_list():
-
-        tool = Tool(
-            name=t.get_tool_name(),
-            func=t.get_tool_function(),
-            description=t.get_tool_description())
-
-        tool_function_list.append(tool)
+        tool_function = t.get_tool_function()
+        tool_function_list.append(tool_function)
 
     tool_function_seq: Sequence[BaseTool] = tool_function_list
 
@@ -403,6 +414,7 @@ async def main():
     await message_queue.put("STOP")
 
     stop_event.set()
+
     await consumer_task
 
 

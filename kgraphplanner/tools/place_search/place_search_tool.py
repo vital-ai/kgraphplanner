@@ -1,5 +1,6 @@
-from typing import Callable, Tuple
+from typing import Callable, Type
 from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.place_search.place_search_request import \
     PlaceSearchRequest
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.place_search.place_search_response import \
@@ -11,7 +12,11 @@ from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_cache import ToolCache
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
-from typing_extensions import TypedDict
+
+
+
+class PlaceParams(BaseModel):
+    place_search_string: str = Field(..., description="The place label of the place.")
 
 
 class PlaceSearchTool(AbstractTool):
@@ -44,10 +49,16 @@ class PlaceSearchTool(AbstractTool):
     def get_sample_text(self) -> str:
         pass
 
+    def get_tool_schema(self) -> Type[BaseModel]:
+        return PlaceParams
+
     def get_tool_function(self) -> Callable:
 
-        @tool
-        def place_search(place_search_string: str) -> PlaceSearchData:
+        @tool("place-search-tool", args_schema=PlaceParams, return_direct=True)
+        def place_search(
+                place_search_string: str
+
+        ) -> PlaceSearchData:
             """
             Use this to get place data including the latitude and longitude of a location.
             Use format of City Name, State Abbreviation, such as:
@@ -56,9 +67,6 @@ class PlaceSearchTool(AbstractTool):
             123 Main Street, Anytown, NY, USA
             The results will include a list of potential matches.
             You should decide which of these is the one you want.
-
-            Attributes:
-                place_search_string (str): The place search string.
             """
 
             print(f"PlaceSearchTool called with location: {place_search_string}")

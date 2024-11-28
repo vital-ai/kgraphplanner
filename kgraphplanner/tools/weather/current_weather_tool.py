@@ -1,10 +1,10 @@
-from typing import Callable, List, Union
+from typing import Callable, List, Union, Type
 
-from typing_extensions import TypedDict
+from pydantic import BaseModel, Field
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.place_search.place_search_request import \
     PlaceSearchRequest
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.place_search.place_search_response import PlaceDetails, \
-    PlaceSearchData
+    PlaceSearchData, PlaceSearchResponse
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather_request import WeatherRequest
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather_response import WeatherResponse, \
     WeatherData
@@ -16,6 +16,10 @@ from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
 from langchain_core.tools import tool
+
+
+class CurrentWeatherParams(BaseModel):
+    place_name: str = Field(..., description="The place name of weather location.")
 
 
 class CurrentWeatherTool(AbstractTool):
@@ -42,7 +46,7 @@ class CurrentWeatherTool(AbstractTool):
 
         client_tool_response = client.handle_tool_request("place_search_tool", place_search_request)
 
-        place_search_results = client_tool_response.tool_results
+        place_search_results: PlaceSearchResponse = client_tool_response.tool_results
 
         place_search_data: Union[PlaceSearchData|None] = place_search_results.get('place_search_data', None)
 
@@ -83,15 +87,16 @@ class CurrentWeatherTool(AbstractTool):
     def get_sample_text(self) -> str:
         pass
 
+    def get_tool_schema(self) -> Type[BaseModel]:
+        return CurrentWeatherParams
+
+
     def get_tool_function(self) -> Callable:
 
         @tool
         def get_current_weather(place_name: str) -> WeatherData:
             """
             Use this to get weather information for today and the next few days given the name of a place.
-
-                Attributes:
-                    place_name (str): The place name of the weather location.
             """
 
             params = {
