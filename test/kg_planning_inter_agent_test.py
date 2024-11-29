@@ -23,6 +23,8 @@ import queue
 
 def process_stream(stream, messages_out: list) -> TypedDict:
 
+    logger = logging.getLogger("HaleyAgentLogger")
+
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
     final_result = None
@@ -31,7 +33,7 @@ def process_stream(stream, messages_out: list) -> TypedDict:
 
     for s in stream:
 
-        print(s)
+        logger.info(s)
 
         iteration += 1
 
@@ -39,12 +41,12 @@ def process_stream(stream, messages_out: list) -> TypedDict:
 
         for m in messages:
             t = type(m)
-            print(f"Stream {iteration}: History ({t}): {m}")
+            logger.info(f"Stream {iteration}: History ({t}): {m}")
 
         final_response = s.get("final_response", None)
 
         if final_response:
-            print(s)
+            logger.info(s)
             final_result = s
         else:
             # parallel tools add more than one message,
@@ -52,19 +54,19 @@ def process_stream(stream, messages_out: list) -> TypedDict:
             message = s["messages"][-1]
             messages_out.append(message)
             if isinstance(message, tuple):
-                print(message)
+                logger.info(message)
             else:
                 message.pretty_print()
             # final_result = s
 
-    print(final_result)
+    logger.info(final_result)
 
     response = final_result.get("final_response", None)
 
-    print("Final_Result:\n")
-    print("--------------------------------------")
-    pp.pprint(response)
-    print("--------------------------------------")
+    logger.info("Final_Result:\n")
+    logger.info("--------------------------------------")
+    logger.info(pp.pformat(response))
+    logger.info("--------------------------------------")
     return response
 
 
@@ -118,9 +120,8 @@ system_message_content = """
     
     Begin List of Available Tools:
     --------------------
-    Current_Weather_Tool
-    Weather_Tool
-
+  
+    
     Place_Search
     Search_Contacts
     Send_Message
@@ -157,14 +158,23 @@ system_message_content = """
     --------------------
     BaseAgentRequest schema:
     
-        class BaseAgentRequest(TypedDict):
+        class BaseAgentRequest(BaseModel):
         
-            Represents the BaseClass to collect the parameters for a request to an Agent
+            Represents the base class to collect the parameters for a request to an Agent
         
-        Attributes:
+        Args:
             request_class_name (str): The name of the class of the request, which must be a subclass of BaseAgentRequest.
             agent_name (str): The name of the agent being called.
             agent_call_justification (str): A justification for why the agent being called to complete a goal.
+
+    CallAgentCapture schema:
+    
+        class CallAgentCapture(BaseModel)
+            Arguments for capturing a request to an Agent.
+        
+        Args:
+            agent_request: Type[BaseAgentRequest]: The details of the Agent request which must be in an instance of a subclass of BaseAgentRequest
+
 
     --------------------
     """
@@ -181,6 +191,8 @@ system_message_content = """
 
 
 def case_one(tool_manager, graph):
+
+    logger = logging.getLogger("HaleyAgentLogger")
 
     pp = pprint.PrettyPrinter(indent=4, width=40)
 
@@ -228,7 +240,7 @@ def case_one(tool_manager, graph):
 
     for m in messages_out:
         t = type(m)
-        print(f"History ({t}): {m}")
+        logger.info(f"History ({t}): {m}")
 
     response_class_name = agent_status_response.get("response_class_name", None)
 
@@ -240,35 +252,37 @@ def case_one(tool_manager, graph):
         agent_request_status_message = agent_status_response.get("agent_request_status_message", None)
         missing_input = agent_status_response.get("missing_input", None)
 
-        print(f"Status: {agent_request_status}")
+        logger.info(f"Status: {agent_request_status}")
 
-        print(f"Human Text: {human_text_request}")
-        print(f"Agent Text: {agent_text_response}")
+        logger.info(f"Human Text: {human_text_request}")
+        logger.info(f"Agent Text: {agent_text_response}")
 
         for agent_payload in agent_payload_list:
 
-            pp.pprint(agent_payload)
+            logger.info(pp.pformat(agent_payload))
 
             payload_class_name = agent_payload.get("payload_class_name", None)
             payload_guid = agent_payload.get("payload_guid", None)
 
-            print("--------------------------------------")
-            print(f"Agent GUID: {payload_guid}")
-            print(f"Agent Class Name: {payload_class_name}")
-            print("--------------------------------------")
+            logger.info("--------------------------------------")
+            logger.info(f"Agent GUID: {payload_guid}")
+            logger.info(f"Agent Class Name: {payload_class_name}")
+            logger.info("--------------------------------------")
 
     if response_class_name == "AgentCallResponse":
-        print("--------------------------------------")
-        print("Agent Call Response List:")
+        logger.info("--------------------------------------")
+        logger.info("Agent Call Response List:")
         agent_call_list = agent_status_response.get("agent_call_list", [])
         for call_capture in agent_call_list:
             agent_call_guid = call_capture.get("agent_call_guid", None)
             agent_call_request = call_capture.get("agent_call_request", None)
 
-            pp.pprint(call_capture)
+            logger.info(pp.pformat(call_capture))
         print("--------------------------------------")
 
 def case_two(tool_manager, graph):
+
+    logger = logging.getLogger("HaleyAgentLogger")
 
     config = {"configurable": {"thread_id": "urn:thread_1"}}
 
@@ -287,14 +301,16 @@ def case_two(tool_manager, graph):
 
     messages_out = []
 
-    print_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
+    process_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)
-        print(f"History ({t}): {m}")
+        logger.info(f"History ({t}): {m}")
 
 
 def case_three(tool_manager, graph):
+
+    logger = logging.getLogger("HaleyAgentLogger")
 
     config = {"configurable": {"thread_id": "urn:thread_2"}}
 
@@ -314,19 +330,21 @@ def case_three(tool_manager, graph):
 
     messages_out = []
 
-    print_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
+    process_stream(graph.stream(inputs, config, stream_mode="values"), messages_out)
 
     for m in messages_out:
         t = type(m)
-        print(f"History ({t}): {m}")
+        logger.info(f"History ({t}): {m}")
 
 
 def reasoning_consumer(message_queue: queue.Queue, stop_event: threading.Event):
 
+    logger = logging.getLogger("HaleyAgentLogger")
+
     while not stop_event.is_set():
         try:
             message = message_queue.get(timeout=0.5)
-            print(f"Consumed: {message}")
+            logger.info(f"Consumed: {message}")
             if message == "STOP":
                 break
 
@@ -343,6 +361,10 @@ def reasoning_consumer(message_queue: queue.Queue, stop_event: threading.Event):
 
 def main():
     print("KG Planning Inter Agent Test")
+
+    logging.basicConfig(level=logging.INFO)
+
+    logger = logging.getLogger("HaleyAgentLogger")
 
     load_dotenv()
 
@@ -361,8 +383,8 @@ def main():
 
     consumer_thread.start()
 
-    model_tools = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
-    model_structured = ChatOpenAI(model="gpt-4o", callbacks=[logging_handler], temperature=0)
+    model_tools = ChatOpenAI(model_name="gpt-4o", callbacks=[logging_handler], temperature=0)
+    model_structured = ChatOpenAI(model_name="gpt-4o", callbacks=[logging_handler], temperature=0)
 
     tool_endpoint = "http://localhost:8008"
 
@@ -399,25 +421,21 @@ def main():
 
     place_search_tool = PlaceSearchTool(place_search_config, tool_manager=tool_manager)
 
-    weather_tool = WeatherInfoTool(weather_config,  tool_manager=tool_manager)
+    # weather_tool = WeatherInfoTool(weather_config,  tool_manager=tool_manager)
 
-    current_weather_tool = CurrentWeatherTool(current_weather_config,  tool_manager=tool_manager)
+    # current_weather_tool = CurrentWeatherTool(current_weather_config,  tool_manager=tool_manager)
 
-    search_contacts_tool = SearchContactsTool(search_contacts_config,  tool_manager=tool_manager)
+    # search_contacts_tool = SearchContactsTool(search_contacts_config,  tool_manager=tool_manager)
 
-    send_message_tool = SendMessageTool(send_message_config,  tool_manager=tool_manager)
+    # send_message_tool = SendMessageTool(send_message_config,  tool_manager=tool_manager)
 
     # getting tools to use in agent into a function list
     tool_function_list = []
 
     for t in tool_manager.get_tool_list():
 
-        tool = Tool(
-            name=t.get_tool_name(),
-            func=t.get_tool_function(),
-            description=t.get_tool_description())
-
-        tool_function_list.append(tool)
+        tool_func = t.get_tool_function()
+        tool_function_list.append(tool_func)
 
     tool_function_seq: Sequence[BaseTool] = tool_function_list
 

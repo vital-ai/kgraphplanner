@@ -38,6 +38,8 @@ from langgraph.utils.runnable import RunnableCallable
 
 from pydantic import BaseModel
 
+from kgraphplanner.tools_internal.agent.call_agent_tool import AgentWeatherRequest
+
 INVALID_TOOL_NAME_ERROR_TEMPLATE = (
     "Error: {requested_tool} is not a valid tool, try one of [{available_tools}]."
 )
@@ -198,10 +200,22 @@ class ToolNode(RunnableCallable):
             *,
             store: BaseStore,
     ) -> Any:
+
+        logger = logging.getLogger("HaleyAgentLogger")
+
+        logger.info(f"func: {input}")
+
         tool_calls, output_type = self._parse_input(input, store)
+
+        logger.info(f"func parse: {input}")
+
+
         config_list = get_config_list(config, len(tool_calls))
+
         with get_executor_for_config(config) as executor:
             outputs = [*executor.map(self._run_one, tool_calls, config_list)]
+            logger.info(f"func executor: {outputs}")
+
         # TypedDict, pydantic, dataclass, etc. should all be able to load from dict
         return outputs if output_type == "list" else {self.messages_key: outputs}
 
@@ -230,6 +244,10 @@ class ToolNode(RunnableCallable):
             *,
             store: BaseStore,
     ) -> Any:
+        logger = logging.getLogger("HaleyAgentLogger")
+
+        # logger.info(f"afunc: {input}")
+
         tool_calls, output_type = self._parse_input(input, store)
         outputs = await asyncio.gather(
             *(self._arun_one(call, config) for call in tool_calls)
@@ -238,17 +256,46 @@ class ToolNode(RunnableCallable):
         return outputs if output_type == "list" else {self.messages_key: outputs}
 
     def _run_one(self, call: ToolCall, config: RunnableConfig) -> ToolMessage:
+
+        logger = logging.getLogger("HaleyAgentLogger")
+
         if invalid_tool_message := self._validate_tool_call(call):
             return invalid_tool_message
 
         try:
             input = {**call, **{"type": "tool_call"}}
+
+            logger.info(f"run one input: {input}")
+
+            args = input.get("args", {})
+
+            # TODO registry of schemas for agents
+            # convert the dict that function call returned back to agent schema
+
+            if args:
+                agent_request = args.get("agent_request", {})
+                if agent_request:
+                    request_class_name = agent_request.get("request_class_name")
+                    if request_class_name == 'AgentWeatherRequest':
+                        agent_request_instance = AgentWeatherRequest.model_validate(agent_request)
+                        args["agent_request"] = agent_request_instance
+
+            logger.info(f"updated run one input: {input}")
+
             tool_message: ToolMessage = self.tools_by_name[call["name"]].invoke(
                 input, config
             )
+
+            logger.info(f"run one tool message: {tool_message}")
+
+
             tool_message.content = cast(
                 Union[str, list], msg_content_output(tool_message.content)
             )
+
+            logger.info(f"run one tool message content: {tool_message.content}")
+
+
             return tool_message
         # GraphInterrupt is a special exception that will always be raised.
         # It can be triggered in the following scenarios:

@@ -1,32 +1,34 @@
 import json
+import logging
 import uuid
-from typing import Callable, List, Dict, Annotated, Union
+from typing import Callable, List, Dict, Annotated, Union, Type
 
-from kgraphplanner.inter.agents.agent_weather.agent_weather_schema import AgentWeatherRequest
-from kgraphplanner.inter.base_agent_schema import BaseAgentRequest
+# from kgraphplanner.inter.agents.agent_weather.agent_weather_schema import AgentWeatherRequest
+# from kgraphplanner.inter.base_agent_schema import BaseAgentRequest
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
 from langchain_core.tools import tool
-
 from pydantic import BaseModel, Field
 
 
-#class BaseAgentRequest(BaseModel):
-#    request_class_name: str
-#    agent_name: str
-#    agent_call_justification: str
+class BaseAgentRequest(BaseModel):
+    request_class_name: str = Field(..., description="The name of the request class.")
+    agent_name: str = Field(..., description="The name of the agent.")
+    agent_call_justification: str = Field(..., description="The justification for calling the agent.")
 
 
-# class AgentWeatherRequest(BaseAgentRequest):
-#    place_name: str = Field(..., description="The place name of the weather location")
+class AgentWeatherRequest(BaseAgentRequest):
+    place_name_list: List[str] = Field(..., description="The list of place names of the weather locations")
 
 
-# class CallAgentCapture(BaseModel):
-#    """Arguments for capturing a request to an Agent."""
-#    agent_request: Annotated[BaseAgentRequest, ..., "The details of the Agent request which must be in a subclass of BaseAgentRequest"]
+class CallAgentCapture(BaseModel):
+    """Arguments for capturing a request to an Agent."""
+    agent_request: BaseAgentRequest = Field(..., description="The details of the Agent request which must be an instance of a subclass of BaseAgentRequest")
 
-AgentRequestType = Union[BaseAgentRequest, AgentWeatherRequest]
+# AgentRequestType = Union[BaseAgentRequest, AgentWeatherRequest]
+
+# AgentRequestType = Union[AgentWeatherRequest]
 
 
 class CallAgentTool(AbstractTool):
@@ -52,6 +54,9 @@ class CallAgentTool(AbstractTool):
     def get_sample_text(self) -> str:
         pass
 
+    def get_tool_schema(self) -> Type[BaseModel]:
+        return CallAgentCapture
+
     def get_tool_function(self) -> Callable:
 
         # Note: this should be a dict but is being passed in as a string sometimes
@@ -73,26 +78,36 @@ class CallAgentTool(AbstractTool):
         # def call_agent(agent_request: BaseAgentRequest) -> str:
 
         # @tool(args_schema=CallAgentCapture)
-        #def call_agent(agent_request: BaseAgentRequest|str) -> str:
-        @tool
-        def call_agent(agent_request: AgentRequestType) -> str:
+        # def call_agent(agent_request: BaseAgentRequest|str) -> str:
+        @tool("call-agent-tool", args_schema=CallAgentCapture, return_direct=True)
+        def call_agent( agent_request: Type[BaseAgentRequest]) -> str:
             """
             Use this to capture a requested call to an agent.
-
-            Attributes:
-                agent_request (BaseAgentRequest): The details of the Agent request which must be in a subclass of BaseAgentRequest"]
 
             Returns str: The GUID of the requested call to the agent
             """
 
+            logger = logging.getLogger("HaleyAgentLogger")
+
+            logger.info("call agent tool")
+
+            # agent_request = {key: value for key, value in kwargs.items()}
+
+            # agent_request = {
+            #    "request_class_name": request_class_name,
+            #    "agent_name": agent_name,
+            #    "agent_call_justification": agent_call_justification,
+            #    "place_name_list": place_name_list
+            # }
+
             # need to validate against tool schemas
-            if type(agent_request) is str:
-                agent_request = json.loads(agent_request)
+            #if type(agent_request) is str:
+            #    agent_request = json.loads(agent_request)
 
             guid = str(uuid.uuid4())
 
-            print(f"CallAgentTool called with agent request: {agent_request}")
-            print(f"CallAgentTool assigned agent request: {guid}")
+            logger.info(f"CallAgentTool called with agent request: {agent_request}")
+            logger.info(f"CallAgentTool assigned agent request: {guid}")
 
             agent_call = {
                 "guid": guid,

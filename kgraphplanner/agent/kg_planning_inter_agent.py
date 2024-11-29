@@ -1,4 +1,5 @@
 import json
+import logging
 import queue
 from typing import (
     Optional,
@@ -46,13 +47,10 @@ class KGPlanningInterAgent(KGPlanningBaseAgent):
 
         self.call_agent_tool = CallAgentTool({})
 
-        call_agent_tool = Tool(
-            name=self.call_agent_tool.get_tool_name(),
-            func=self.call_agent_tool.get_tool_function(),
-            description=self.call_agent_tool.get_tool_description())
+        call_agent_tool_func = self.call_agent_tool.get_tool_function()
 
         self.internal_tools = [
-            call_agent_tool
+            call_agent_tool_func
         ]
 
         self.reasoning_queue = reasoning_queue
@@ -167,11 +165,13 @@ class KGPlanningInterAgent(KGPlanningBaseAgent):
 
     def should_continue(self, state: AgentState):
 
+        logger = logging.getLogger("HaleyAgentLogger")
+
         messages = state["messages"]
 
         for m in messages:
             t = type(m)
-            print(f"should_continue: History ({t}): {m}")
+            logging.info(f"should_continue: History ({t}): {m}")
 
         last_message = messages[-1]
 
@@ -192,6 +192,7 @@ class KGPlanningInterAgent(KGPlanningBaseAgent):
                 self.post_to_reasoning_queue(reasoning_message)
 
                 return "agent_call"
+
             else:
                 reasoning_message = {
                     "agent_thought": "there are no pending agent requests."
@@ -228,6 +229,9 @@ class KGPlanningInterAgent(KGPlanningBaseAgent):
 
     def end_state(self, state: AgentState, config: RunnableConfig):
 
+        logger = logging.getLogger("HaleyAgentLogger")
+
+
         # print(f"State: {state}")
         # print(f"Config: {config}")
 
@@ -245,7 +249,7 @@ class KGPlanningInterAgent(KGPlanningBaseAgent):
 
             for m in messages:
                 t = type(m)
-                print(f"end_state: History ({t}): {m}")
+                logger.info(f"end_state: History ({t}): {m}")
 
             system_message = messages[0]
 
@@ -363,6 +367,7 @@ Previous Messages:
         instructions_message = HumanMessage(content=internal_instructions)
 
         new_messages = []
+
         for m in messages:
             new_messages.append(m)
 
@@ -417,5 +422,3 @@ Previous Messages:
         return {
             "final_response": agent_call_response
         }
-
-
