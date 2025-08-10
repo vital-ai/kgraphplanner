@@ -7,7 +7,7 @@ from rich.console import Console
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from typing_extensions import TypedDict
+from typing import TypedDict
 from kgraphplanner.agent.kg_planning_inter_agent import KGPlanningInterAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
@@ -138,7 +138,7 @@ system_message_content = """
         
             Use this to get weather information for today and the next few days given the name of a place.
         
-            Attributes:
+            Args:
                 place_name_list (List[str]): The place name of the weather location, you may list multiple place names in a comma separated list
 
     Response Schema:

@@ -17,14 +17,21 @@ class BaseAgentRequest(BaseModel):
     agent_name: str = Field(..., description="The name of the agent.")
     agent_call_justification: str = Field(..., description="The justification for calling the agent.")
 
+    class Config:
+        json_schema_extra = {
+            "discriminator": "request_class_name"
+        }
+
 
 class AgentWeatherRequest(BaseAgentRequest):
+    request_class_name: str = "AgentWeatherRequest"
     place_name_list: List[str] = Field(..., description="The list of place names of the weather locations")
 
 
 class CallAgentCapture(BaseModel):
     """Arguments for capturing a request to an Agent."""
-    agent_request: BaseAgentRequest = Field(..., description="The details of the Agent request which must be an instance of a subclass of BaseAgentRequest")
+    # this union would need to be built dynamically
+    agent_request: Union[AgentWeatherRequest, BaseAgentRequest] = Field(..., description="The details of the Agent request which must be an instance of a subclass of BaseAgentRequest")
 
 # AgentRequestType = Union[BaseAgentRequest, AgentWeatherRequest]
 

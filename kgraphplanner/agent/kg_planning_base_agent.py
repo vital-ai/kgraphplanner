@@ -8,7 +8,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from typing_extensions import TypedDict
+from typing import TypedDict
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,

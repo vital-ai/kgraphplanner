@@ -1,6 +1,6 @@
 from typing import Callable, Optional, Type
 from pydantic import BaseModel, Field
-from typing_extensions import TypedDict
+from typing import TypedDict
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather_request import WeatherRequest
 from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.weather_response import WeatherResponse, \
     WeatherData

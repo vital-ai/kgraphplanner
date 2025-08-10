@@ -25,3 +25,5 @@ class GenerateAgentWeatherSchema:
     # use temporarily for testing until replaced with dynamically generated
     # version for generating based on declared input/output of agent
     # as defined by input/output messages and KG frames
+    # need to dynamically generate the Union of the request classes to include them to the LLM call:
+    # agent_request: Union[AgentWeatherRequest, BaseAgentRequest] = Field(..., description="The details of the Agent request which must be an instance of a subclass of BaseAgentRequest")

@@ -1,5 +1,5 @@
 from typing import Optional, Annotated, List
-from typing_extensions import TypedDict
+from typing import TypedDict
 
 
 class AgentStatusResponse(TypedDict):

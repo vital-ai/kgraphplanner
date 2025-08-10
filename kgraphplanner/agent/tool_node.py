@@ -25,11 +25,11 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.utils import Input
 from langchain_core.tools.base import get_all_basemodel_annotations
 from langgraph.errors import GraphInterrupt
-from typing_extensions import Annotated, get_origin
+from typing import Annotated, get_origin
 from langchain_core.runnables.config import get_config_list, get_executor_for_config
 from langchain_core.tools import BaseTool, InjectedToolArg
 from langchain_core.tools import tool as create_tool
-from typing_extensions import get_args
+from typing import get_args
 from langgraph.store.base import BaseStore
 from langgraph.utils.runnable import RunnableCallable
 
@@ -690,7 +690,9 @@ class InjectedState(InjectedToolArg):
     Example:
         ```python
         from typing import List
-        from typing_extensions import Annotated, TypedDict
+        from typing import Annotated
+        from typing import TypedDict
+
 
         from langchain_core.messages import BaseMessage, AIMessage
         from langchain_core.tools import tool
@@ -755,7 +757,7 @@ class InjectedStore(InjectedToolArg):
     Example:
         ```python
         from typing import Any
-        from typing_extensions import Annotated
+        from typing import Annotated
 
         from langchain_core.messages import AIMessage
         from langchain_core.tools import tool

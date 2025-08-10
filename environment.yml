@@ -1,0 +1,28 @@
+name: kgraphplanner
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.12
+  - pip
+  - pip:
+    - vital-ai-vitalsigns>=0.1.32
+    - vital-ai-aimp>=0.1.16
+    - vital-ai-haley-kg>=0.1.24
+    - kgraphagent>=0.0.1
+    - vital-agent-kg-utils>=0.1.5
+    - langchain-core>=0.3.21
+    - langchain==0.3.9
+    - langchain-openai==0.2.1
+    - langgraph==0.2.53
+    - langgraph-checkpoint==2.0.7
+    - langsmith
+    - python-dotenv
+    - rich>=13.7.1
+    - pydantic>=2.8.2
+    # Development dependencies (uncomment if needed)
+    # - twine
+    # - setuptools
+    # - pygraphviz
+    # - nest-asyncio
+    # - pyppeteer

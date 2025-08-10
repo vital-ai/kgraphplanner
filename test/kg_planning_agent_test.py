@@ -15,7 +15,11 @@ from kgraphplanner.tools.send_message.send_message_tool import SendMessageTool
 from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 
 
-def print_stream(stream, messages_out: list = []):
+def print_stream(stream, messages_out: list = None):
+
+    if messages_out is None:
+        messages_out = []
+
     for s in stream:
         message = s["messages"][-1]
         messages_out.append(message)
@@ -173,7 +177,7 @@ def main():
         t = type(m)
         print(f"History ({t}): {m}")
 
-    exit(0)
+    # exit(0)
 
     content = "who are you and who am I?"
 

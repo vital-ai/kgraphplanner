@@ -1,5 +1,5 @@
 from typing import Annotated, List
-from typing_extensions import TypedDict
+from typing import TypedDict
 from kgraphplanner.inter.base_agent_schema import BaseAgentRequest
 
 

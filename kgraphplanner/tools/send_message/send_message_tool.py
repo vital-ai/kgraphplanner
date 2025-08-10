@@ -3,7 +3,9 @@ from typing import Callable, Tuple
 from langchain_core.tools import tool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
-from typing_extensions import TypedDict
+from typing import TypedDict
+from pydantic import BaseModel, Field
+from typing import Callable, Optional, Type
 
 
 class SMSMessage(TypedDict):
@@ -25,6 +27,16 @@ class SMSMessage(TypedDict):
     sender_telephone: str  # Telephone number of Sender
     sender_name: str  # Name of sender
     message: str  # Content of the SMS Message
+
+
+
+class SendMessageParams(BaseModel):
+    recipient_telephone: str = Field(..., description="Telephone number of Recipient.")
+    recipient_name: str = Field(..., description="Name of recipient.")
+
+    sender_telephone: str = Field(..., description="Telephone number of Sender.")
+    sender_name: str = Field(..., description="Name of sender.")
+    message: str = Field(..., description="Content of the SMS Message.")
 
 
 class SendMessageTool(AbstractTool):
@@ -50,5 +62,9 @@ class SendMessageTool(AbstractTool):
             return True
 
         return send_sms_message
+
+    def get_tool_schema(self) -> Type[BaseModel]:
+        return SendMessageParams
+
 
 

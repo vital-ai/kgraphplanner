@@ -1,9 +1,14 @@
 import pprint
-from typing import Callable, List
+from typing import Callable, List, Dict, Annotated, Union, Type
+
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
 from langchain_core.tools import tool
+from pydantic import BaseModel, Field
+
+
+# TODO add schema class
 
 
 class CaptureResponseTool(AbstractTool):
@@ -12,6 +17,9 @@ class CaptureResponseTool(AbstractTool):
 
     def get_sample_text(self) -> str:
         pass
+
+    def get_tool_schema(self) -> Type[BaseModel]:
+        return None # CallAgentCapture
 
     def get_tool_function(self) -> Callable:
 

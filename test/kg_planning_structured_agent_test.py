@@ -3,12 +3,14 @@ import logging
 from typing import List, Any, Sequence, Callable
 from dotenv import load_dotenv
 from datetime import datetime
+
+from langchain_core.runnables.graph import MermaidDrawMethod
 from langchain_core.tools import Tool, BaseTool, StructuredTool
 from rich.console import Console
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from typing_extensions import TypedDict
+from typing import TypedDict
 from kgraphplanner.agent.kg_planning_structured_agent import KGPlanningStructuredAgent
 from kgraphplanner.checkpointer.memory_checkpointer import MemoryCheckpointer
 from kgraphplanner.tool_manager.tool_manager import ToolManager
@@ -18,7 +20,9 @@ from kgraphplanner.tools_internal.kgraph_query.search_contacts_tool import Searc
 from kgraphplanner.tools.send_message.send_message_tool import SendMessageTool
 from kgraphplanner.tools.weather.weather_info_tool import WeatherInfoTool
 import pprint
+import nest_asyncio
 
+nest_asyncio.apply()
 
 async def process_stream(stream, messages_out: list) -> TypedDict:
 
@@ -398,7 +402,16 @@ async def main():
 
     graph = agent.compile()
 
-    image_bytes = graph.get_graph().draw_mermaid_png()
+    # this times out sometimes
+    # image_bytes = graph.get_graph().draw_mermaid_png()
+
+    # be sure to use websockets >= 12.0.0 for agent container
+    image_bytes = graph.get_graph().draw_mermaid_png(
+        draw_method=MermaidDrawMethod.PYPPETEER
+    )
+
+    # this runs locally via graphviz, which must be installed (via bew on mac os)
+    # image_bytes = graph.get_graph().draw_png()
 
     with open('output_image.png', 'wb') as image_file:
         image_file.write(image_bytes)

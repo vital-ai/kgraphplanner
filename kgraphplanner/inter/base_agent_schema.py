@@ -1,5 +1,5 @@
 from typing import Annotated, Optional
-from typing_extensions import TypedDict
+from typing import TypedDict
 
 
 class BaseAgentRequest(TypedDict):

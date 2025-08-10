@@ -3,7 +3,9 @@ from langchain_core.tools import tool
 from kgraphplanner.tool_manager.abstract_tool import AbstractTool
 from kgraphplanner.tool_manager.tool_request import ToolRequest
 from kgraphplanner.tool_manager.tool_response import ToolResponse
-from typing_extensions import TypedDict
+from typing import TypedDict
+from pydantic import BaseModel, Field
+from typing import Callable, Optional, Type
 
 # Note: this is meant to be implemented via a knowledge graph query of the user's knowledge graph
 
@@ -20,6 +22,12 @@ class Contact(TypedDict):
     contact_name: str  # Name of Contact
     contact_telephone: str  # Telephone number of Contact
     contact_email: str  # EMail of Contact
+
+
+class SearchContactsParams(BaseModel):
+    contact_name: str = Field(..., description="Name of Contact.")
+    contact_telephone: str = Field(..., description="Telephone number of Contact.")
+    contact_email: str = Field(..., description="EMail of Contact.")
 
 
 class SearchContactsTool(AbstractTool):
@@ -68,4 +76,8 @@ class SearchContactsTool(AbstractTool):
             return contact_list
 
         return search_contacts
+
+    def get_tool_schema(self) -> Type[BaseModel]:
+        return SearchContactsParams
+
 

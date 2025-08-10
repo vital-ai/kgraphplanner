@@ -1,6 +1,6 @@
 from typing import Optional, Annotated, List
 
-from typing_extensions import TypedDict
+from typing import TypedDict
 
 from kgraphplanner.structured_response.structured_response import StructuredResponse
 

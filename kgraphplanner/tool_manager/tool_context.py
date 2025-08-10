@@ -1,5 +1,5 @@
 from typing import Optional
-from typing_extensions import TypedDict
+from typing import TypedDict
 
 
 # accessed by a tool via the tool_manager
