@@ -187,10 +187,62 @@ class KGraphToolWorker(KGraphWorker):
             slot["iters"] += 1
             
             if slot["iters"] > self.max_iters:
-                slot["last_decision"] = {"type": "final", "answer": "I've reached the maximum number of iterations. Based on your request, I'll provide a response with the information I have."}
+                logger.info(
+                    f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' "
+                    f"hit max_iters ({self.max_iters}), making final summarization call"
+                )
+                # Build messages for a final summarization call (no tools)
+                summary_messages = []
+                if self.system_directive:
+                    summary_messages.append(SystemMessage(content=self.system_directive))
+                prompt = activation.get("prompt", "")
+                args = activation.get("args", {})
+                if prompt:
+                    summary_messages.append(SystemMessage(content=f"Task instructions: {prompt}"))
+                if args and "request" in args:
+                    summary_messages.append(HumanMessage(content=args["request"]))
+                elif prompt or args:
+                    parts = []
+                    if prompt:
+                        parts.append(prompt)
+                    if args:
+                        parts.append(f"Context: {json.dumps(args, default=str)}")
+                    summary_messages.append(HumanMessage(content="\n".join(parts)))
+                # Include tool history so the LLM can see all gathered data
+                tool_history = slot.get("tool_history", [])
+                for ai_msg, tool_msgs in tool_history:
+                    summary_messages.append(ai_msg)
+                    for tool_msg in tool_msgs:
+                        summary_messages.append(tool_msg)
+                summary_messages.append(SystemMessage(
+                    content="You have used all available tool iterations. "
+                            "Do NOT call any more tools. Provide your final, "
+                            "comprehensive answer now using the information "
+                            "you have already gathered above."
+                ))
+                try:
+                    _t_sum = time.time()
+                    summary_response = await self.llm.ainvoke(summary_messages)
+                    _t_sum_done = time.time()
+                    answer = getattr(summary_response, 'content', '') or ''
+                    logger.info(
+                        f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' "
+                        f"max-iter summarization took {_t_sum_done - _t_sum:.1f}s  "
+                        f"content_len={len(answer)}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Tool worker '{occurrence_id}' max-iter summarization failed: {e}")
+                    answer = (
+                        "Maximum iterations reached. Based on the tool results "
+                        "gathered so far, I was unable to produce a final summary."
+                    )
+                slot["last_decision"] = {"type": "final", "answer": answer}
                 return {
                     "work": {occurrence_id: slot},
-                    "agent_data": {"errors": {occurrence_id: f"Max iterations exceeded in {occurrence_id}"}}
+                    "agent_data": {
+                        "decisions": {occurrence_id: slot["last_decision"]},
+                        "errors": {occurrence_id: f"Max iterations exceeded in {occurrence_id}"}
+                    }
                 }
             
             # Build messages for decision

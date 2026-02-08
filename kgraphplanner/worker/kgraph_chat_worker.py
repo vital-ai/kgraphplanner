@@ -78,14 +78,34 @@ class KGraphChatWorker(KGraphWorker):
                 messages.extend(state_messages)
                 user_query = state_messages[-1].content if state_messages else ""
                 logger.debug(f"Chat worker '{occurrence_id}' included {len(state_messages)} history messages from state")
-                # When activation args carry data that is NOT already in
-                # state_messages (e.g. resolve_worker receiving worker_output
-                # from a previous worker step), append it so the LLM can see it.
-                if args and "worker_output" in args:
-                    wo = str(args["worker_output"])
-                    messages.append(HumanMessage(content=wo))
-                    user_query = wo
-                    logger.debug(f"Chat worker '{occurrence_id}' appended worker_output from activation args ({len(wo)} chars)")
+                # In multi-worker pipelines an upstream worker's output is
+                # passed to this worker via activation args.  That data is
+                # NOT in state_messages (which only hold the original user
+                # conversation).  Detect novel arg values and append them so
+                # the LLM can actually see the data it needs to work with.
+                # All novel args are included (not just one) because fan-in
+                # gather nodes may pass multiple upstream results as separate
+                # named args (e.g. analysis_a, analysis_b for an aggregator).
+                if args:
+                    last_content = state_messages[-1].content if state_messages else ""
+                    novel_parts = []
+                    for k, v in args.items():
+                        v_str = str(v)
+                        if v_str == last_content:
+                            continue
+                        if len(v_str) < 20:
+                            continue
+                        novel_parts.append((k, v_str))
+                    if novel_parts:
+                        context = "\n\n".join(
+                            f"[{k}]\n{v}" for k, v in novel_parts
+                        )
+                        messages.append(HumanMessage(content=context))
+                        user_query = context
+                        logger.debug(
+                            f"Chat worker '{occurrence_id}' appended {len(novel_parts)} "
+                            f"novel activation arg(s) ({len(context)} chars total)"
+                        )
             else:
                 # No state messages — fall back to args-based HumanMessage
                 if args and "request" in args:

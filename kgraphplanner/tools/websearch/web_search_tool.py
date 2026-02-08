@@ -76,10 +76,7 @@ class WebSearchTool(AbstractTool):
             # Get tool endpoint from config
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
-                # Return error in WebSearchOutput format for consistency
-                return WebSearchOutput(
-                    results=[]
-                )
+                return "No web search results available: tool endpoint is not configured."
             
             # Create client configuration
             client_config = {
@@ -98,17 +95,23 @@ class WebSearchTool(AbstractTool):
                 # Execute the search
                 tool_response = client.handle_tool_request(ToolNameEnum.google_web_search_tool.value, web_search_input)
                 
+                if tool_response is None or tool_response.tool_output is None:
+                    logger.warning(f"Web search tool returned None response for query: {search_query}")
+                    return f"No web search results available for query: {search_query}"
+                
                 # Extract results - should be WebSearchOutput
                 web_search_results: WebSearchOutput = tool_response.tool_output
+                
+                results = getattr(web_search_results, 'results', None) or []
+                if not results:
+                    logger.info(f"Web search returned empty results for query: {search_query}")
+                    return f"Web search returned no results for query: {search_query}"
                 
                 return web_search_results
                 
             except Exception as e:
                 logger.warning(f"Web search tool error: {e}")
-                error_output = WebSearchOutput(
-                    results=[]
-                )
-                return error_output
+                return f"No web search results available for query: {search_query} (error: {e})"
         
         return google_web_search_tool
     
