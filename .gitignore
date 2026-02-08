@@ -6,4 +6,4 @@ dist/*
 .env
 **/__pycache__/*
 test/*.png
-
+test_output/

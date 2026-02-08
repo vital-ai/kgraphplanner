@@ -1,0 +1,55 @@
+graph TD
+    node_start(("start [start]"))
+    final_aggregator["final_aggregator (report_aggregator)"]
+    node_end["end [end]"]
+    research_0["research_0 (research_worker)"]
+    financial_analysis_0["financial_analysis_0 (financial_analyst)"]
+    technical_analysis_0["technical_analysis_0 (technical_analyst)"]
+    synthesis_0["synthesis_0 (synthesis_analyst)"]
+    research_1["research_1 (research_worker)"]
+    financial_analysis_1["financial_analysis_1 (financial_analyst)"]
+    technical_analysis_1["technical_analysis_1 (technical_analyst)"]
+    synthesis_1["synthesis_1 (synthesis_analyst)"]
+    research_2["research_2 (research_worker)"]
+    financial_analysis_2["financial_analysis_2 (financial_analyst)"]
+    technical_analysis_2["technical_analysis_2 (technical_analyst)"]
+    synthesis_2["synthesis_2 (synthesis_analyst)"]
+    research_3["research_3 (research_worker)"]
+    financial_analysis_3["financial_analysis_3 (financial_analyst)"]
+    technical_analysis_3["technical_analysis_3 (technical_analyst)"]
+    synthesis_3["synthesis_3 (synthesis_analyst)"]
+    research_4["research_4 (research_worker)"]
+    financial_analysis_4["financial_analysis_4 (financial_analyst)"]
+    technical_analysis_4["technical_analysis_4 (technical_analyst)"]
+    synthesis_4["synthesis_4 (synthesis_analyst)"]
+    final_aggregator -->|"Finalize the comprehensive AI ..."| node_end
+    node_start -->|"Begin research for OpenAI"| research_0
+    research_0 -->|"Analyze financial aspects of O..."| financial_analysis_0
+    research_0 -->|"Analyze technical aspects of O..."| technical_analysis_0
+    financial_analysis_0 -->|"Combine financial and technica..."| synthesis_0
+    technical_analysis_0 -->|"Combine financial and technica..."| synthesis_0
+    synthesis_0 -->|"Include OpenAI analysis in fin..."| final_aggregator
+    node_start -->|"Begin research for Anthropic"| research_1
+    research_1 -->|"Analyze financial aspects of A..."| financial_analysis_1
+    research_1 -->|"Analyze technical aspects of A..."| technical_analysis_1
+    financial_analysis_1 -->|"Combine financial and technica..."| synthesis_1
+    technical_analysis_1 -->|"Combine financial and technica..."| synthesis_1
+    synthesis_1 -->|"Include Anthropic analysis in ..."| final_aggregator
+    node_start -->|"Begin research for Google Deep..."| research_2
+    research_2 -->|"Analyze financial aspects of G..."| financial_analysis_2
+    research_2 -->|"Analyze technical aspects of G..."| technical_analysis_2
+    financial_analysis_2 -->|"Combine financial and technica..."| synthesis_2
+    technical_analysis_2 -->|"Combine financial and technica..."| synthesis_2
+    synthesis_2 -->|"Include Google DeepMind analys..."| final_aggregator
+    node_start -->|"Begin research for Cohere"| research_3
+    research_3 -->|"Analyze financial aspects of C..."| financial_analysis_3
+    research_3 -->|"Analyze technical aspects of C..."| technical_analysis_3
+    financial_analysis_3 -->|"Combine financial and technica..."| synthesis_3
+    technical_analysis_3 -->|"Combine financial and technica..."| synthesis_3
+    synthesis_3 -->|"Include Cohere analysis in fin..."| final_aggregator
+    node_start -->|"Begin research for Mistral"| research_4
+    research_4 -->|"Analyze financial aspects of M..."| financial_analysis_4
+    research_4 -->|"Analyze technical aspects of M..."| technical_analysis_4
+    financial_analysis_4 -->|"Combine financial and technica..."| synthesis_4
+    technical_analysis_4 -->|"Combine financial and technica..."| synthesis_4
+    synthesis_4 -->|"Include Mistral analysis in fi..."| final_aggregator

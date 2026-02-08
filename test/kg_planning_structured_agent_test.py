@@ -410,7 +410,7 @@ async def main():
         draw_method=MermaidDrawMethod.PYPPETEER
     )
 
-    # this runs locally via graphviz, which must be installed (via bew on mac os)
+    # this runs locally via graphviz, which must be installed (via brew on mac os)
     # image_bytes = graph.get_graph().draw_png()
 
     with open('output_image.png', 'wb') as image_file:
