@@ -233,7 +233,17 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             cond_by_source[e.source].append(e)
         
         # --- 1. Wire start → worker edges ---
+        # Prune redundant start edges: if a destination also has incoming
+        # worker edges, the start edge would fire before the upstream worker
+        # completes, bypassing the required data flow.
         for dest_id, dest_edges in start_by_dest.items():
+            if dest_id in worker_by_dest:
+                logger.info(
+                    f"Pruning redundant start edge(s) to '{dest_id}' — "
+                    f"already reached via worker edge(s) from "
+                    f"{[e.source for e in worker_by_dest[dest_id]]}"
+                )
+                continue
             if len(dest_edges) == 1:
                 hop_id = _safe_id("__hop__", "start", "to", dest_id)
                 graph.add_node(hop_id, _make_hop(dest_edges[0], dest_id))

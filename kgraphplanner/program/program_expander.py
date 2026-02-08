@@ -80,6 +80,25 @@ def validate_program_spec(program: ProgramSpec) -> Tuple[bool, List[str]]:
             )
             return False, messages
     
+    # Check for redundant start→downstream loop_edges that bypass required flow.
+    # If a node is already a fan_out destination, a loop_edge from "start" to
+    # it would fire before the upstream worker completes, skipping data flow.
+    for template in program.templates:
+        fan_out_dests = set()
+        for fo in template.fan_out:
+            for branch in fo.branches:
+                fan_out_dests.add(branch.destination_tpl)
+        for le in template.loop_edges:
+            if le.source_tpl == "start" and le.destination_tpl in fan_out_dests:
+                messages.append(
+                    f"ERROR: Template '{template.name}' has a redundant loop_edge "
+                    f"'start' -> '{le.destination_tpl}' which is already reached via "
+                    f"fan_out. This edge would bypass the required upstream worker. "
+                    f"Remove this loop_edge — use loop_edges only for start -> "
+                    f"the first step in the loop (e.g., start -> research_{{idx}})."
+                )
+                return False, messages
+    
     # Check for missing bindings on template loop_edges and fan_out branches
     for template in program.templates:
         # loop_edges: any edge whose source is not "start" and dest is not "end" needs bindings
