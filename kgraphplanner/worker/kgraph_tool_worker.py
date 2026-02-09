@@ -404,7 +404,7 @@ If you have enough information to answer directly, provide your response without
                 tool_name = tool_call['name']
                 tool_args = tool_call.get('args', {})
                 
-                logger.debug(f"Processing tool call {i+1}/{len(ai_message_with_tools.tool_calls)}: {tool_name} id={tool_call_id} args={tool_args}")
+                logger.info(f"🔧 Tool call {i+1}/{len(ai_message_with_tools.tool_calls)} for '{occurrence_id}': {tool_name} args={tool_args}")
                 
                 # Validate tool exists
                 if tool_name not in self.available_tool_ids:
@@ -439,11 +439,14 @@ If you have enough information to answer directly, provide your response without
                     # Coerce tool arguments
                     args = self._coerce_tool_args(tool_func, tool_args, activation.get("args", {}))
                     
-                    logger.debug(f"Executing tool {tool_name} with coerced args: {args}")
+                    logger.info(f"🔍 [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' query: {args}")
                     _t_tool = time.time()
                     result = await tool_func.ainvoke(args)
-                    logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' took {time.time() - _t_tool:.1f}s")
-                    logger.debug(f"Raw tool result type: {type(result)}")
+                    _t_tool_elapsed = time.time() - _t_tool
+                    logger.info(
+                        f"⏱️ [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' "
+                        f"took {_t_tool_elapsed:.1f}s  result:\n{result}"
+                    )
                     
                     # Convert result to JSON string for tool message content
                     try:
@@ -493,21 +496,37 @@ If you have enough information to answer directly, provide your response without
             """Generate final response and clean up."""
             logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' finalize_node START")
             
-            # Get decision from agent_data (primary location)
-            agent_decisions = state.get("agent_data", {}).get("decisions", {})
-            decision = agent_decisions.get(occurrence_id, {})
+            # Prefer work slot's last_decision (always current within the
+            # worker's sequential decision→tool→decision loop) over
+            # agent_data.decisions which can be stale when multiple workers
+            # run in parallel (e.g. KGraphCaseAgent fan-out).
+            slot = self._get_worker_slot(state, occurrence_id)
+            decision = slot.get("last_decision", {})
             
-            # Fallback to work slot if not found in agent_data
+            # Fallback to agent_data if work slot has no decision
             if not decision:
-                slot = self._get_worker_slot(state, occurrence_id)
-                decision = slot.get("last_decision", {})
+                agent_decisions = state.get("agent_data", {}).get("decisions", {})
+                decision = agent_decisions.get(occurrence_id, {})
             
             answer = decision.get("answer", "No activation data provided")
-            logger.debug(f"Finalize node - answer: {str(answer)[:100] if answer else 'None'}...")
+            if not isinstance(answer, str):
+                answer = json.dumps(answer, indent=2, default=str)
             
             activation = state.get("agent_data", {}).get("activation", {}).get(occurrence_id, {})
             
-            logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' finalize_node END")
+            # Render the final output with proper line breaks
+            rendered = (answer or "").replace("\\n", "\n")
+            sep = "=" * 72
+            lines = [
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' finalize_node END",
+                sep,
+                f"  FINAL OUTPUT: {occurrence_id}",
+                sep,
+            ]
+            for line in rendered.split("\n"):
+                lines.append(f"  {line}")
+            lines.append(sep)
+            logger.info("\n".join(lines))
             
             # Return partial update — reducers handle merging
             return {

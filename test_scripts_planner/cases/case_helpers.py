@@ -115,7 +115,12 @@ def make_generic_registry(
             llm=exec_llm,
             system_directive=(
                 "Use available tools to research the given topic. "
-                "Produce factual, well-sourced notes with URLs where possible."
+                "Your output MUST include specific named entities "
+                "(restaurants, places, businesses, etc.) — not just "
+                "general reference links or city overviews. "
+                "Search for concrete recommendations, reviews, and "
+                "ranked lists. Include names, addresses/neighborhoods, "
+                "and source URLs."
             ),
             tool_manager=tool_manager,
             available_tool_ids=tool_ids,

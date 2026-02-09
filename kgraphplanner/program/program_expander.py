@@ -262,15 +262,25 @@ def expand_program_to_graph(
         logger.info(f"  Processing {len(items)} items")
         
         for idx, item in enumerate(items):
+            from types import SimpleNamespace
+            
+            def _to_namespace(obj):
+                """Recursively convert dicts to SimpleNamespace for dot-access."""
+                if isinstance(obj, dict):
+                    return SimpleNamespace(**{k: _to_namespace(v) for k, v in obj.items()})
+                if isinstance(obj, list):
+                    return [_to_namespace(i) for i in obj]
+                return obj
+            
             context = {
                 template.for_each.item_var: item,
                 template.for_each.idx_var: idx,
+                "start": _to_namespace(start_args),
                 **{k: v for k, v in start_args.items() if isinstance(v, (str, int, float, bool))}
             }
             # If item is a dict, flatten its string keys into context and
             # wrap in SimpleNamespace so {item_var.key} dot-access works.
             if isinstance(item, dict):
-                from types import SimpleNamespace
                 context[template.for_each.item_var] = SimpleNamespace(**item)
                 for k, v in item.items():
                     if isinstance(v, str):
