@@ -1,0 +1,54 @@
+# config/weaviate_collections.yaml
+#
+# Defines the schema for each Weaviate collection used by the document CLI.
+# Properties listed here are created when `create` or `load` runs.
+
+collections:
+  KnowledgeBase:
+    description: "Guide chapters and primary knowledge content"
+    vectorizer: none
+    properties:
+      - name: text
+        data_type: text
+        description: "Chunk text content"
+      - name: source
+        data_type: text
+        description: "Source filename"
+        indexFilterable: true
+      - name: collection
+        data_type: text
+        description: "Logical collection name"
+        indexFilterable: true
+      - name: chunk_index
+        data_type: int
+        description: "Chunk position within the source document"
+
+  Appendix:
+    description: "Guide appendices (glossary, quick-reference, comparisons)"
+    vectorizer: none
+    properties:
+      - name: text
+        data_type: text
+      - name: source
+        data_type: text
+        indexFilterable: true
+      - name: collection
+        data_type: text
+        indexFilterable: true
+      - name: chunk_index
+        data_type: int
+
+  CompanyDocs:
+    description: "Company profile, reviews, reference cards"
+    vectorizer: none
+    properties:
+      - name: text
+        data_type: text
+      - name: source
+        data_type: text
+        indexFilterable: true
+      - name: collection
+        data_type: text
+        indexFilterable: true
+      - name: chunk_index
+        data_type: int

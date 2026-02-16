@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import os
 import json
-import yaml
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-from pathlib import Path
 
 _DEFAULT_ENV_PREFIX = "KGPLAN"
 
@@ -94,6 +92,31 @@ class CheckpointConfig:
     """Configuration for checkpointing."""
     enabled: bool = True
     backend: str = "memory"
+    redis_url: str = "redis://localhost:6381"
+    redis_ttl: int = 3600
+    redis_env: str = "dev"
+    redis_app: str = ""
+    redis_cluster: str = "auto"
+
+
+@dataclass(frozen=True)
+class WeaviateConfig:
+    """Configuration for the Weaviate vector store connection."""
+    enabled: bool = False
+    http_host: str = "localhost"
+    http_port: int = 8080
+    http_secure: bool = False
+    grpc_host: str = ""              # defaults to http_host if empty
+    grpc_port: int = 50051
+    grpc_secure: bool = False
+    skip_init_checks: bool = False
+    auth_mode: str = "none"          # "bearer", "api_key", or "none"
+    default_collection: str = "KnowledgeBase"
+    embedding_provider: str = "openai"           # "openai", "huggingface", "cohere", etc.
+    embedding_model: str = "text-embedding-3-small"
+    search_type: str = "mmr"         # "mmr" or "similarity"
+    search_k: int = 6
+    search_fetch_k: int = 20
 
 
 @dataclass(frozen=True)
@@ -113,11 +136,11 @@ class AgentConfig:
             tools=ToolConfig(endpoint="http://localhost:9000", enabled=["weather_tool"]),
         )
 
-    Or from a YAML file::
+    Or from environment variables (preferred)::
 
-        config = AgentConfig.from_yaml("agent_config.yaml")
+        config = AgentConfig.from_env()
 
-    Or from a plain dict (e.g. loaded from a database)::
+    Or from a plain dict::
 
         config = AgentConfig.from_dict({"tools": {"endpoint": "..."}})
     """
@@ -127,20 +150,11 @@ class AgentConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     checkpointing: CheckpointConfig = field(default_factory=CheckpointConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
+    weaviate: WeaviateConfig = field(default_factory=WeaviateConfig)
     logging_level: str = "INFO"
     logging_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     # --- Factory classmethods ------------------------------------------------
-
-    @classmethod
-    def from_yaml(cls, config_path: str) -> AgentConfig:
-        """Load configuration from a YAML file."""
-        config_file = Path(config_path)
-        if not config_file.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-        with open(config_file, "r") as f:
-            data = yaml.safe_load(f) or {}
-        return cls.from_dict(data)
 
     @classmethod
     def from_env(cls, prefix: str = _DEFAULT_ENV_PREFIX) -> AgentConfig:
@@ -182,12 +196,36 @@ class AgentConfig:
         cp_config = CheckpointConfig(
             enabled=cp_data.get("enabled", CheckpointConfig.enabled),
             backend=cp_data.get("backend", CheckpointConfig.backend),
+            redis_url=cp_data.get("redis_url", CheckpointConfig.redis_url),
+            redis_ttl=int(cp_data.get("redis_ttl", CheckpointConfig.redis_ttl)),
+            redis_env=cp_data.get("redis_env", CheckpointConfig.redis_env),
+            redis_app=cp_data.get("redis_app", CheckpointConfig.redis_app),
+            redis_cluster=str(cp_data.get("redis_cluster", CheckpointConfig.redis_cluster)),
         )
 
         mem_data = data.get("memory", {})
         mem_config = MemoryConfig(
             enabled=mem_data.get("enabled", MemoryConfig.enabled),
             max_history=mem_data.get("max_history", MemoryConfig.max_history),
+        )
+
+        wv_data = data.get("weaviate", {})
+        wv_grpc_host = wv_data.get("grpc_host", WeaviateConfig.grpc_host)
+        wv_config = WeaviateConfig(
+            enabled=wv_data.get("enabled", WeaviateConfig.enabled),
+            http_host=wv_data.get("http_host", WeaviateConfig.http_host),
+            http_port=int(wv_data.get("http_port", WeaviateConfig.http_port)),
+            http_secure=wv_data.get("http_secure", WeaviateConfig.http_secure),
+            grpc_host=wv_grpc_host or wv_data.get("http_host", WeaviateConfig.http_host),
+            grpc_port=int(wv_data.get("grpc_port", WeaviateConfig.grpc_port)),
+            grpc_secure=wv_data.get("grpc_secure", WeaviateConfig.grpc_secure),
+            skip_init_checks=wv_data.get("skip_init_checks", WeaviateConfig.skip_init_checks),
+            auth_mode=wv_data.get("auth_mode", WeaviateConfig.auth_mode),
+            default_collection=wv_data.get("default_collection", WeaviateConfig.default_collection),
+            embedding_model=wv_data.get("embedding_model", WeaviateConfig.embedding_model),
+            search_type=wv_data.get("search_type", WeaviateConfig.search_type),
+            search_k=int(wv_data.get("search_k", WeaviateConfig.search_k)),
+            search_fetch_k=int(wv_data.get("search_fetch_k", WeaviateConfig.search_fetch_k)),
         )
 
         agent_data = data.get("agent", {})
@@ -200,6 +238,7 @@ class AgentConfig:
             model=model_config,
             checkpointing=cp_config,
             memory=mem_config,
+            weaviate=wv_config,
             logging_level=log_data.get("level", cls.logging_level),
             logging_format=log_data.get("format", cls.logging_format),
         )
@@ -221,6 +260,11 @@ class AgentConfig:
     def get_enabled_tools(self) -> List[str]:
         """Get list of enabled tool name strings."""
         return list(self.tools.enabled)
+
+    def get_weaviate_config(self) -> Dict[str, Any]:
+        """Get Weaviate configuration as a plain dict."""
+        from dataclasses import asdict
+        return asdict(self.weaviate)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Dot-notation lookup for backward compatibility.

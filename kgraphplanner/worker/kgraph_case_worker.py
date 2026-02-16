@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Dict, Any, Tuple, List
 from dataclasses import dataclass
 
@@ -8,6 +9,8 @@ from langgraph.runtime import get_runtime
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -94,9 +97,11 @@ class KGraphCaseWorker(KGraphWorker):
                 return self._finalize_result(state, occurrence_id, f"Error: {error_msg}")
             
             # Build messages for LLM
+            # Resolve directive: args may override/append via bindings
+            effective_directive = self._resolve_system_directive(args)
             messages = []
-            if self.system_directive:
-                messages.append(SystemMessage(content=self.system_directive))
+            if effective_directive:
+                messages.append(SystemMessage(content=effective_directive))
             
             # Get the user input to categorize
             user_input = args.get("query", args.get("message", args.get("input", "")))
@@ -141,6 +146,16 @@ Please categorize this input: "{user_input}" """
                 "cases_count": len(cases_to_use)
             })
             
+            # Log LLM parameters for diagnostics (works for both OpenAI and Anthropic)
+            _llm_inner = getattr(self.llm, 'bound', self.llm)  # unwrap RunnableBinding
+            _llm_params = {
+                "model": getattr(_llm_inner, 'model_name', getattr(_llm_inner, 'model', '?')),
+                "temperature": getattr(_llm_inner, 'temperature', '?'),
+                "max_tokens": getattr(_llm_inner, 'max_tokens', 'None'),
+                "n_messages": len(messages),
+            }
+            logger.info(f"Case worker '{occurrence_id}' LLM params: {_llm_params}")
+
             try:
                 # Make LLM call
                 response = await self.llm.ainvoke(messages)
@@ -157,23 +172,25 @@ Please categorize this input: "{user_input}" """
                         break
                 
                 if selected_case:
+                    result_summary = f"Categorized as: {selected_case.name} ({selected_case.id})"
                     final_result = {
                         "selected_case_id": selected_case.id,
                         "selected_case_name": selected_case.name,
                         "selected_case_description": selected_case.description,
+                        "result_text": result_summary,
                         "raw_response": result_text,
                         "input": user_input
                     }
-                    result_summary = f"Categorized as: {selected_case.name} ({selected_case.id})"
                 else:
+                    result_summary = f"Categorized as: {selected_case_id} (no match found)"
                     final_result = {
                         "selected_case_id": selected_case_id,
                         "selected_case_name": "Unknown",
                         "selected_case_description": "No matching category found",
+                        "result_text": result_summary,
                         "raw_response": result_text,
                         "input": user_input
                     }
-                    result_summary = f"Categorized as: {selected_case_id} (no match found)"
                 
                 writer({
                     "phase": "case_complete",

@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-import requests
+import httpx
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
@@ -37,7 +37,7 @@ OUTPUT_DIR = os.path.join(project_root, "test_output")
 
 # --- Auth & tool setup ---
 
-def get_keycloak_token():
+async def get_keycloak_token():
     """Get JWT token from Keycloak using env credentials."""
     username = os.getenv('KEYCLOAK_USER')
     password = os.getenv('KEYCLOAK_PASSWORD')
@@ -60,7 +60,8 @@ def get_keycloak_token():
         data['client_secret'] = client_secret
 
     try:
-        resp = requests.post(token_url, data=data, timeout=5)
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(token_url, data=data, timeout=5)
         resp.raise_for_status()
         token = resp.json().get('access_token')
         if not token:
@@ -70,13 +71,13 @@ def get_keycloak_token():
         return None, f"Keycloak token request failed: {e}"
 
 
-def create_tool_manager():
+async def create_tool_manager():
     """Create ToolManager with config from KGPLAN__ env vars, loaded tools, and JWT auth."""
     config = AgentConfig.from_env()
     tm = ToolManager(config=config)
     tm.load_tools_from_config()
 
-    token, err = get_keycloak_token()
+    token, err = await get_keycloak_token()
     if err:
         print(f"  JWT auth: {err}")
     else:

@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kgraphplanner"
+version = "0.0.24"
+description = "KGraph Planner"
+readme = "README.md"
+license = {text = "Apache License 2.0"}
+requires-python = ">=3.12"
+authors = [
+    {name = "Marc Hadfield", email = "marc@vital.ai"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "vital-ai-vitalsigns>=0.1.47",
+    "vital-ai-aimp>=0.1.16",
+    "vital-ai-haley-kg>=0.1.24",
+    "langchain-core>=1.2.9",
+    "langchain-openai>=1.1.7",
+    "langchain-anthropic>=1.3.3",
+    "langgraph>=1.0.8",
+    "langgraph-checkpoint>=4.0.0",
+    "redis>=5.0.0",
+    "langsmith",
+    "weaviate-client>=4.10,<5",
+    "langchain-weaviate>=0.0.6",
+    "langchain-text-splitters>=1.0.0",
+    "langchain-community>=0.4.0",
+    "httpx>=0.27",
+    "python-dotenv",
+    "rich>=13.7.1",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "twine",
+    "setuptools",
+    "pygraphviz",
+    "nest-asyncio",
+    "pyppeteer",
+    "build",
+]
+
+[project.urls]
+Homepage = "https://github.com/vital-ai/kgraphplanner"
+Repository = "https://github.com/vital-ai/kgraphplanner"
+
+[tool.setuptools.packages.find]
+include = ["kgraphplanner*"]
+exclude = [
+    "test",
+    "test.*",
+    "test_scripts",
+    "test_scripts.*",
+    "test_scripts_planner",
+    "test_scripts_planner.*",
+    "test_scripts_internal",
+    "test_scripts_internal.*",
+    "kgraphplanner_orig",
+    "kgraphplanner_orig.*",
+    "kgraphplanner.tools_internal",
+    "kgraphplanner.tools_internal.*",
+    "notes",
+    "notes.*",
+    "planning",
+    "planning.*",
+    "planning_internal",
+    "planning_internal.*",
+    "docs",
+    "docs.*",
+    "bin",
+    "bin.*",
+]
+
+[tool.setuptools.package-data]
+kgraphplanner = ["*.pyi"]

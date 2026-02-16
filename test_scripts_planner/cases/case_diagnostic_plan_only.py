@@ -25,46 +25,10 @@ from langchain_core.messages import HumanMessage
 from kgraphplanner.agent.kgraph_planner_agent import KGraphPlannerAgent
 from kgraphplanner.worker.kgraph_chat_worker import KGraphChatWorker
 from kgraphplanner.worker.kgraph_tool_worker import KGraphToolWorker
-from kgraphplanner.config.agent_config import AgentConfig
 from kgraphplanner.tool_manager.tool_manager import ToolManager
 from kgraphplanner.program.program_expander import expand_program_to_graph
 from test_scripts_planner.cases.test_result import TestResult
-
-import requests
-
-
-def _get_keycloak_token():
-    username = os.getenv('KEYCLOAK_USER')
-    password = os.getenv('KEYCLOAK_PASSWORD')
-    realm = os.getenv('KEYCLOAK_REALM')
-    client_id = os.getenv('KEYCLOAK_CLIENT_ID')
-    client_secret = os.getenv('KEYCLOAK_CLIENT_SECRET')
-    if not username or not password:
-        return None, "KEYCLOAK_USER/KEYCLOAK_PASSWORD not set"
-    token_url = f"http://localhost:8085/realms/{realm}/protocol/openid-connect/token"
-    data = {'grant_type': 'password', 'client_id': client_id,
-            'username': username, 'password': password, 'scope': 'openid profile email'}
-    if client_secret:
-        data['client_secret'] = client_secret
-    try:
-        resp = requests.post(token_url, data=data, timeout=5)
-        resp.raise_for_status()
-        token = resp.json().get('access_token')
-        return (token, None) if token else (None, "No access_token")
-    except Exception as e:
-        return None, f"Keycloak failed: {e}"
-
-
-def _create_tool_manager():
-    config = AgentConfig.from_env()
-    tm = ToolManager(config=config)
-    tm.load_tools_from_config()
-    token, err = _get_keycloak_token()
-    if err:
-        print(f"  JWT auth: {err}")
-    else:
-        tm.set_jwt_token(token)
-    return tm
+from test_scripts_planner.cases.case_helpers import create_tool_manager
 
 
 def _make_registry(exec_llm, tool_manager):
@@ -220,7 +184,7 @@ async def run() -> TestResult:
 
     # Set up tools (needed for registry)
     try:
-        tm = _create_tool_manager()
+        tm = await create_tool_manager()
         available = tm.list_available_tools()
         print(f"  Available tools: {available}")
     except Exception as e:

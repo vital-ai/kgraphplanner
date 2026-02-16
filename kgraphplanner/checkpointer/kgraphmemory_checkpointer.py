@@ -2,6 +2,7 @@
 KGraph Memory Checkpointer - In-memory implementation of LangGraph checkpoint interface
 """
 import logging
+import asyncio
 from typing import Optional, Dict, Any, List, Iterator, Tuple
 from collections import defaultdict
 from contextlib import AbstractContextManager, AbstractAsyncContextManager
@@ -210,13 +211,19 @@ class KGraphMemoryCheckpointer(BaseCheckpointSaver[str], AbstractContextManager,
         return config
     
     def put_writes(self, config: Dict[str, Any], writes: List[Tuple[str, Any]], task_id: str) -> None:
-        """Store intermediate writes linked to a checkpoint."""
+        """Store intermediate writes linked to a checkpoint.
+        
+        LangGraph expects pending_writes as 3-tuples (task_id, channel, value).
+        The `writes` arg arrives as 2-tuples (channel, value); we prepend task_id.
+        """
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"].get("checkpoint_id", task_id)
         
         key = f"{checkpoint_ns}:{checkpoint_id}"
-        self.writes[thread_id][key].extend(writes)
+        self.writes[thread_id][key].extend(
+            (task_id, k, v) for k, v in writes
+        )
     
     def delete_thread(self, thread_id: str) -> None:
         """Delete all checkpoints and writes associated with a thread ID."""
@@ -225,26 +232,28 @@ class KGraphMemoryCheckpointer(BaseCheckpointSaver[str], AbstractContextManager,
         if thread_id in self.writes:
             del self.writes[thread_id]
     
-    # Async versions (for compatibility)
+    # Async versions — offload to thread to avoid blocking the event loop.
+    # For in-memory dicts this is fast, but correctness matters when the
+    # checkpointer is used inside an async LangGraph agent.
     async def aget_tuple(self, config: Dict[str, Any]) -> Optional[CheckpointTuple]:
         """Asynchronous version of get_tuple."""
-        return self.get_tuple(config)
+        return await asyncio.to_thread(self.get_tuple, config)
     
     async def alist(self, config: Dict[str, Any], *, filter: Optional[Dict[str, Any]] = None, before: Optional[str] = None, limit: Optional[int] = None) -> List[CheckpointTuple]:
         """Asynchronous version of list."""
-        return list(self.list(config, filter=filter, before=before, limit=limit))
+        return await asyncio.to_thread(lambda: list(self.list(config, filter=filter, before=before, limit=limit)))
     
     async def aput(self, config: Dict[str, Any], checkpoint: Checkpoint, metadata: CheckpointMetadata, new_versions: Dict[str, Any]) -> Dict[str, Any]:
         """Asynchronous version of put."""
-        return self.put(config, checkpoint, metadata, new_versions)
+        return await asyncio.to_thread(self.put, config, checkpoint, metadata, new_versions)
     
     async def aput_writes(self, config: Dict[str, Any], writes: List[Tuple[str, Any]], task_id: str) -> None:
         """Asynchronous version of put_writes."""
-        self.put_writes(config, writes, task_id)
+        return await asyncio.to_thread(self.put_writes, config, writes, task_id)
     
     async def adelete_thread(self, thread_id: str) -> None:
         """Asynchronous version of delete_thread."""
-        self.delete_thread(thread_id)
+        await asyncio.to_thread(self.delete_thread, thread_id)
     
     # Context manager methods
     def __enter__(self):

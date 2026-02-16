@@ -34,7 +34,6 @@ from datetime import datetime
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-import requests
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
@@ -44,60 +43,11 @@ from langchain_core.runnables.graph import MermaidDrawMethod
 from kgraphplanner.agent.kgraph_planner_agent import KGraphPlannerAgent
 from kgraphplanner.worker.kgraph_chat_worker import KGraphChatWorker
 from kgraphplanner.worker.kgraph_tool_worker import KGraphToolWorker
-from kgraphplanner.config.agent_config import AgentConfig
 from kgraphplanner.tool_manager.tool_manager import ToolManager
 from test_scripts_planner.cases.test_result import TestResult
+from test_scripts_planner.cases.case_helpers import create_tool_manager
 
 OUTPUT_DIR = os.path.join(project_root, "test_output")
-
-
-def _get_keycloak_token():
-    """Get JWT token from Keycloak using env credentials."""
-    username = os.getenv('KEYCLOAK_USER')
-    password = os.getenv('KEYCLOAK_PASSWORD')
-    realm = os.getenv('KEYCLOAK_REALM')
-    client_id = os.getenv('KEYCLOAK_CLIENT_ID')
-    client_secret = os.getenv('KEYCLOAK_CLIENT_SECRET')
-
-    if not username or not password:
-        return None, "KEYCLOAK_USER/KEYCLOAK_PASSWORD not set"
-
-    token_url = f"http://localhost:8085/realms/{realm}/protocol/openid-connect/token"
-    data = {
-        'grant_type': 'password',
-        'client_id': client_id,
-        'username': username,
-        'password': password,
-        'scope': 'openid profile email'
-    }
-    if client_secret:
-        data['client_secret'] = client_secret
-
-    try:
-        resp = requests.post(token_url, data=data, timeout=5)
-        resp.raise_for_status()
-        token = resp.json().get('access_token')
-        if not token:
-            return None, "No access_token in Keycloak response"
-        return token, None
-    except Exception as e:
-        return None, f"Keycloak token request failed: {e}"
-
-
-def _create_tool_manager():
-    """Create ToolManager with config from KGPLAN__ env vars, loaded tools, and JWT auth."""
-    config = AgentConfig.from_env()
-    tm = ToolManager(config=config)
-    tm.load_tools_from_config()
-
-    token, err = _get_keycloak_token()
-    if err:
-        print(f"  JWT auth: {err}")
-    else:
-        tm.set_jwt_token(token)
-        print(f"  JWT token set")
-
-    return tm
 
 
 def _make_registry(exec_llm, tool_manager):
@@ -194,7 +144,7 @@ async def run() -> TestResult:
 
     # Check tool infrastructure first
     try:
-        tm = _create_tool_manager()
+        tm = await create_tool_manager()
         available = tm.list_available_tools()
         _log(log, f"  Available tools: {available}")
     except Exception as e:

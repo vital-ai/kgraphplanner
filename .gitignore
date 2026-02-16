@@ -3,7 +3,11 @@ dist/*
 **/*.egg-info/*
 .idea/*
 **/*.yaml
+!config/weaviate_collections.yaml
 .env
 **/__pycache__/*
 test/*.png
 test_output/
+
+test_scripts_internal
+planning_internal

@@ -97,6 +97,9 @@ class KGraphToolWorker(KGraphWorker):
             logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' decision_node START")
             logger.debug(f"Tool worker '{occurrence_id}' checking activation: {activation}")
             
+            # Resolve directive early: args may override/append via bindings.
+            effective_directive = self._resolve_system_directive(args)
+            
             # Check if we have activation data or tool results to work with
             slot = self._get_worker_slot(state, occurrence_id)
             
@@ -123,8 +126,8 @@ class KGraphToolWorker(KGraphWorker):
                 
                 # Build messages for final answer generation
                 messages = []
-                if self.system_directive:
-                    messages.append(SystemMessage(content=self.system_directive))
+                if effective_directive:
+                    messages.append(SystemMessage(content=effective_directive))
                 
                 # Add the original user request from state messages
                 for msg in state_messages:
@@ -193,8 +196,8 @@ class KGraphToolWorker(KGraphWorker):
                 )
                 # Build messages for a final summarization call (no tools)
                 summary_messages = []
-                if self.system_directive:
-                    summary_messages.append(SystemMessage(content=self.system_directive))
+                if effective_directive:
+                    summary_messages.append(SystemMessage(content=effective_directive))
                 prompt = activation.get("prompt", "")
                 args = activation.get("args", {})
                 if prompt:
@@ -247,8 +250,8 @@ class KGraphToolWorker(KGraphWorker):
             
             # Build messages for decision
             messages = []
-            if self.system_directive:
-                messages.append(SystemMessage(content=self.system_directive))
+            if effective_directive:
+                messages.append(SystemMessage(content=effective_directive))
             
             prompt = activation.get("prompt", "")
             args = activation.get("args", {})
@@ -571,14 +574,14 @@ If you have enough information to answer directly, provide your response without
             {"TOOL": tool_node_id, "FINAL": finalize_node_id}
         )
         
-        # Finalize node must terminate the graph
-        graph_builder.add_edge(finalize_node_id, END)
-        
         # Tool node loops back to decision
         graph_builder.add_edge(tool_node_id, decision_node_id)
         
-        # Don't set entry point - this causes LangGraph to auto-connect to START
-        # The entry point will be connected through conditional routing from worker_setup
+        # NOTE: No finalize_node → END edge here.  The exec_graph_agent
+        # adds END edges for nodes listed in GraphSpec.exit_points, matching
+        # how KGraphChatWorker and KGraphCaseWorker work.  This allows the
+        # tool worker to be used as an intermediate node in a pipeline
+        # (e.g. content_chat ↔ content_tools loop in the CER agent).
         
         return decision_node_id, finalize_node_id
     

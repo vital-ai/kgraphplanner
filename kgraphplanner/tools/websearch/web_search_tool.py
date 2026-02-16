@@ -7,14 +7,14 @@ logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.web_search.models import (
+from kgraphplanner.vital_agent_rest_resource_client.tools.web_search.models import (
     WebSearchInput, 
     WebSearchOutput
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
+from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
     VitalAgentRestResourceClient
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
+from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
 
@@ -38,7 +38,7 @@ class WebSearchTool(AbstractTool):
         """Get the tool function for web search."""
         
         @tool(args_schema=WebSearchInput)
-        def google_web_search_tool(search_query: str, num_results: int = 5, location: str = None, 
+        async def google_web_search_tool(search_query: str, num_results: int = 5, location: str = None, 
                                  language: str = None, country: str = None, device: str = "desktop",
                                  safe_search: str = None, search_type: str = "search", 
                                  time_period: str = None) -> WebSearchOutput:
@@ -92,8 +92,8 @@ class WebSearchTool(AbstractTool):
             client = VitalAgentRestResourceClient(client_config, jwt_token)
             
             try:
-                # Execute the search
-                tool_response = client.handle_tool_request(ToolNameEnum.google_web_search_tool.value, web_search_input)
+                # Execute the search (async)
+                tool_response = await client.handle_tool_request(ToolNameEnum.google_web_search_tool.value, web_search_input)
                 
                 if tool_response is None or tool_response.tool_output is None:
                     logger.warning(f"Web search tool returned None response for query: {search_query}")

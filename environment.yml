@@ -6,7 +6,7 @@ dependencies:
   - python>=3.12
   - pip
   - pip:
-    - vital-ai-vitalsigns>=0.1.32
+    - vital-ai-vitalsigns>=0.1.47
     - vital-ai-aimp>=0.1.16
     - vital-ai-haley-kg>=0.1.24
     - langchain-openai>=0.3.32
@@ -20,6 +20,10 @@ dependencies:
     #- langgraph==0.2.53
     #- langgraph-checkpoint==2.0.7
     #- langsmith
+    - weaviate-client>=4.10,<5
+    - langchain-weaviate>=0.0.6
+    - langchain-text-splitters>=1.0.0
+    - langchain-community>=0.4.0
     - python-dotenv
     - rich>=13.7.1
     # - pydantic>=2.8.2

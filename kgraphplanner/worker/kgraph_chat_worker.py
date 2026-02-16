@@ -26,7 +26,19 @@ class KGraphChatWorker(KGraphWorker):
     
     The worker takes the activation prompt and args, makes an LLM call,
     and stores the response in the state.
+    
+    When enable_interrupt is True the worker acts as an orchestrator in a
+    chat↔tool loop:
+    - Checks args["lookup_result"] from an upstream tool worker.
+    - If found → short-circuits with action="continue" (no LLM call).
+    - If not found → uses LLM to draft a question, calls
+      request_human_input() to pause the graph, and on resume returns
+      action="lookup" with the user's reply so the tool worker can retry.
+    - On first entry (no lookup_result) → returns action="lookup".
     """
+    
+    enable_interrupt: bool = False
+    parse_json_response: bool = False
     
     def build_subgraph(self, graph_builder: StateGraph, occurrence_id: str) -> Tuple[str, str]:
         """
@@ -51,6 +63,20 @@ class KGraphChatWorker(KGraphWorker):
             logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' START")
             logger.debug(f"Chat worker '{occurrence_id}' checking activation: {activation}")
             
+            # Resolve directive early: args may override/append via bindings.
+            # Must happen before interrupt check so the directive is
+            # available in both the orchestration and normal-chat paths.
+            effective_directive = self._resolve_system_directive(args)
+            
+            # --- Interrupt orchestration (opt-in) ---
+            if self.enable_interrupt:
+                result = await self._handle_interrupt_orchestration(
+                    state, occurrence_id, activation, prompt, args,
+                    writer, _t0, effective_directive,
+                )
+                if result is not None:
+                    return result
+            
             # Only proceed if we have actual activation data
             if not prompt and not args:
                 logger.debug(f"Chat worker '{occurrence_id}' has no activation, skipping")
@@ -61,8 +87,8 @@ class KGraphChatWorker(KGraphWorker):
             
             # Build messages for LLM
             messages = []
-            if self.system_directive:
-                messages.append(SystemMessage(content=self.system_directive))
+            if effective_directive:
+                messages.append(SystemMessage(content=effective_directive))
             
             if prompt:
                 messages.append(SystemMessage(content=f"Task instructions: {prompt}"))
@@ -92,8 +118,6 @@ class KGraphChatWorker(KGraphWorker):
                     for k, v in args.items():
                         v_str = str(v)
                         if v_str == last_content:
-                            continue
-                        if len(v_str) < 20:
                             continue
                         novel_parts.append((k, v_str))
                     if novel_parts:
@@ -136,7 +160,17 @@ class KGraphChatWorker(KGraphWorker):
             
             logger.debug(f"Chat worker '{occurrence_id}' sending {len(messages)} messages to LLM")
             logger.debug(f"Chat worker '{occurrence_id}' user query length: {len(str(user_query))}")
-            
+
+            # Log LLM parameters for diagnostics (works for both OpenAI and Anthropic)
+            _llm_inner = getattr(self.llm, 'bound', self.llm)  # unwrap RunnableBinding
+            _llm_params = {
+                "model": getattr(_llm_inner, 'model_name', getattr(_llm_inner, 'model', '?')),
+                "temperature": getattr(_llm_inner, 'temperature', '?'),
+                "max_tokens": getattr(_llm_inner, 'max_tokens', 'None'),
+                "n_messages": len(messages),
+            }
+            logger.info(f"Chat worker '{occurrence_id}' LLM params: {_llm_params}")
+
             writer({
                 "phase": "chat_start",
                 "node": occurrence_id,
@@ -163,13 +197,21 @@ class KGraphChatWorker(KGraphWorker):
 
                 meta = getattr(response, 'response_metadata', {}) or {}
                 usage = meta.get('token_usage') or meta.get('usage', {})
+                # Normalise across OpenAI / Anthropic field names
+                prompt_tok = usage.get('prompt_tokens', usage.get('input_tokens', '?'))
+                compl_tok = usage.get('completion_tokens', usage.get('output_tokens', '?'))
+                total_tok = usage.get('total_tokens', '?')
+                if total_tok == '?' and prompt_tok != '?' and compl_tok != '?':
+                    total_tok = prompt_tok + compl_tok
+                finish = meta.get('finish_reason', meta.get('stop_reason', '?'))
+                model_id = meta.get('model_name', meta.get('model', '?'))
                 logger.info(
-                    f"� Chat worker '{occurrence_id}' "
-                    f"finish_reason={meta.get('finish_reason', '?')}  "
-                    f"model={meta.get('model_name', meta.get('model', '?'))}  "
-                    f"prompt_tokens={usage.get('prompt_tokens', '?')}  "
-                    f"completion_tokens={usage.get('completion_tokens', '?')}  "
-                    f"total_tokens={usage.get('total_tokens', '?')}"
+                    f"\U0001f4ca Chat worker '{occurrence_id}' "
+                    f"finish_reason={finish}  "
+                    f"model={model_id}  "
+                    f"prompt_tokens={prompt_tok}  "
+                    f"completion_tokens={compl_tok}  "
+                    f"total_tokens={total_tok}"
                 )
 
                 # Log if content is unexpectedly empty or short
@@ -207,6 +249,19 @@ class KGraphChatWorker(KGraphWorker):
                 finalize = self._finalize_result(state, occurrence_id, result_text)
                 finalize["agent_data"]["decisions"] = {occurrence_id: decision}
                 finalize["messages"] = [AIMessage(content=result_text)]
+                
+                # Optional: parse JSON from response and merge into results.
+                # This makes fields like "action", "event_code", etc.
+                # available as top-level keys for conditional routing and
+                # downstream bindings (e.g. result.get('action') == 'tool').
+                if self.parse_json_response:
+                    parsed = self._try_parse_json(result_text)
+                    if parsed is not None:
+                        finalize["agent_data"]["results"][occurrence_id].update(parsed)
+                        logger.debug(
+                            f"Chat worker '{occurrence_id}' parsed JSON response: "
+                            f"{list(parsed.keys())}"
+                        )
                 logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' END ({time.time() - _t0:.1f}s)")
                 return finalize
                 
@@ -237,3 +292,203 @@ class KGraphChatWorker(KGraphWorker):
         
         # Return the same node as both entry and exit
         return chat_node_id, chat_node_id
+    
+    def _make_orchestration_result(
+        self,
+        state: Dict[str, Any],
+        occurrence_id: str,
+        action: str,
+        **extra_fields,
+    ) -> Dict[str, Any]:
+        """
+        Build a finalized result dict for interrupt orchestration.
+        
+        The result includes an 'action' field that downstream conditional
+        routing uses to decide the next node (e.g., "lookup" → tool worker,
+        "continue" → assistant_router).
+        """
+        finalize = self._finalize_result(state, occurrence_id, action)
+        result_payload = finalize["agent_data"]["results"][occurrence_id]
+        result_payload["action"] = action
+        result_payload.update(extra_fields)
+        return finalize
+    
+    async def _handle_interrupt_orchestration(
+        self,
+        state: Dict[str, Any],
+        occurrence_id: str,
+        activation: Dict[str, Any],
+        prompt: str,
+        args: Dict[str, Any],
+        writer,
+        _t0: float,
+        effective_directive: str = "",
+    ) -> Dict[str, Any] | None:
+        """
+        Interrupt orchestration logic for a chat↔tool loop.
+        
+        Checks args["lookup_result"] and returns one of:
+        - action="continue" if the tool found the answer
+        - action="lookup" after interrupting to ask the user for info
+        - action="lookup" on first entry (no lookup_result yet)
+        - None if orchestration does not apply (falls through to normal chat)
+        """
+        lookup_result = args.get("lookup_result")
+        
+        # Tool workers store result_text as a string.  If lookup_result is
+        # a JSON string, parse it so the dict checks below work.
+        # Anthropic models often wrap JSON in markdown fences (```json...```),
+        # so strip those before parsing.
+        if isinstance(lookup_result, str):
+            _stripped = lookup_result.strip()
+            if _stripped.startswith("```"):
+                # Remove opening fence (```json or ```) and closing fence (```)
+                lines = _stripped.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                _stripped = "\n".join(lines).strip()
+            try:
+                lookup_result = json.loads(_stripped)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # --- Case 1: Tool found the answer → exit the loop ---
+        if isinstance(lookup_result, dict) and lookup_result.get("found"):
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"orchestration: found=True → action=continue"
+            )
+            writer({
+                "phase": "orchestration_continue",
+                "node": occurrence_id,
+                "worker": self.name,
+                "lookup_result": lookup_result,
+            })
+            result = self._make_orchestration_result(
+                state, occurrence_id, "continue", loan=lookup_result
+            )
+            result["messages"] = [AIMessage(
+                content=f"Account located. Proceeding with details."
+            )]
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"END ({time.time() - _t0:.1f}s)"
+            )
+            return result
+        
+        # --- Case 2: Tool did not find the answer → ask the user ---
+        if isinstance(lookup_result, dict) and not lookup_result.get("found"):
+            tried = lookup_result.get("tried", [])
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"orchestration: found=False, tried={tried} → drafting question"
+            )
+            
+            # Use LLM to draft a natural-language question
+            draft_messages = []
+            if effective_directive:
+                draft_messages.append(SystemMessage(content=effective_directive))
+            draft_messages.append(SystemMessage(
+                content=(
+                    "The customer wants to look up their account but the lookup "
+                    "failed. Draft a short, friendly question asking for "
+                    "identifying information (loan ID, email, phone, or "
+                    "application ID) so we can try again."
+                )
+            ))
+            if tried:
+                draft_messages.append(HumanMessage(
+                    content=f"We already tried: {', '.join(str(t) for t in tried)}. "
+                            f"Ask for something we haven't tried yet."
+                ))
+            else:
+                draft_messages.append(HumanMessage(
+                    content="We have no identifying information yet. "
+                            "Ask the customer for their loan ID or email."
+                ))
+            
+            response = await self.llm.ainvoke(draft_messages)
+            question = getattr(response, 'content', str(response))
+            
+            writer({
+                "phase": "orchestration_interrupt",
+                "node": occurrence_id,
+                "worker": self.name,
+                "question": question,
+            })
+            
+            # Pause the graph — returns when Command(resume=...) is called
+            user_reply = self.request_human_input(
+                question=question,
+                context={"lookup_result": lookup_result, "tried": tried},
+            )
+            
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"orchestration: resumed with user reply ({len(str(user_reply))} chars)"
+            )
+            
+            result = self._make_orchestration_result(
+                state, occurrence_id, "lookup",
+                user_provided_info=user_reply,
+                previous_attempts=tried,
+            )
+            result["messages"] = [AIMessage(content=question)]
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"END ({time.time() - _t0:.1f}s)"
+            )
+            return result
+        
+        # --- Case 3: First entry (no lookup_result yet) → go to tool ---
+        if lookup_result is None:
+            initial_context = args.get("initial_lookup_result", {})
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"orchestration: first entry → action=lookup"
+            )
+            writer({
+                "phase": "orchestration_first_entry",
+                "node": occurrence_id,
+                "worker": self.name,
+            })
+            result = self._make_orchestration_result(
+                state, occurrence_id, "lookup",
+                initial_context=initial_context,
+            )
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"END ({time.time() - _t0:.1f}s)"
+            )
+            return result
+        
+        # Orchestration did not match — fall through to normal chat
+        return None
+
+    @staticmethod
+    def _try_parse_json(text: str) -> dict | None:
+        """Attempt to parse *text* as JSON, returning a dict or None.
+
+        Handles common LLM quirks:
+        - Markdown code fences (``json ... ``)
+        - Leading/trailing whitespace
+        - Non-dict JSON (arrays, scalars) → returns None
+        """
+        if not text:
+            return None
+        stripped = text.strip()
+        # Strip markdown code fences
+        if stripped.startswith("```"):
+            lines = stripped.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            stripped = "\n".join(lines).strip()
+        try:
+            parsed = json.loads(stripped)
+            return parsed if isinstance(parsed, dict) else None
+        except (json.JSONDecodeError, ValueError):
+            return None

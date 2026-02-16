@@ -6,14 +6,14 @@ logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from langchain_core.tools import tool
 
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.place_search.models import (
+from kgraphplanner.vital_agent_rest_resource_client.tools.place_search.models import (
     PlaceSearchInput, 
     PlaceSearchOutput
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
+from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
     VitalAgentRestResourceClient
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
+from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
 
@@ -37,7 +37,7 @@ class PlaceSearchTool(AbstractTool):
         """Get the tool function for place search."""
         
         @tool(args_schema=PlaceSearchInput)
-        def place_search_tool(place_search_string: str) -> PlaceSearchOutput:
+        async def place_search_tool(place_search_string: str) -> PlaceSearchOutput:
             """
             Search for places and get detailed location information.
             
@@ -73,8 +73,8 @@ class PlaceSearchTool(AbstractTool):
             client = VitalAgentRestResourceClient(client_config, jwt_token)
             
             try:
-                # Execute the search
-                tool_response = client.handle_tool_request(ToolNameEnum.place_search_tool.value, place_search_input)
+                # Execute the search (async)
+                tool_response = await client.handle_tool_request(ToolNameEnum.place_search_tool.value, place_search_input)
                 
                 # Extract results - should be PlaceSearchOutput
                 place_search_results: PlaceSearchOutput = tool_response.tool_output

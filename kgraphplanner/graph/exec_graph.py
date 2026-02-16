@@ -203,7 +203,6 @@ class GraphValidationError(BaseModel):
         "duplicate_node", 
         "invalid_edge", 
         "missing_worker", 
-        "circular_dependency",
         "unreachable_node",
         "missing_required_input"
     ]

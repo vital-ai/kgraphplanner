@@ -79,7 +79,25 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 None
             )
             if start_node and "start" not in results:
-                results["start"] = start_node.initial_data.get("args", start_node.initial_data)
+                import copy
+                results["start"] = copy.deepcopy(
+                    start_node.initial_data.get("args", start_node.initial_data)
+                )
+            
+            # Extract the last human message and merge into start results
+            # so that bindings referencing start.input get the actual user input
+            messages = state.get("messages", [])
+            if messages:
+                last_human = None
+                for msg in reversed(messages):
+                    if getattr(msg, '__class__', None) and msg.__class__.__name__ == 'HumanMessage':
+                        last_human = msg
+                        break
+                if last_human and hasattr(last_human, 'content'):
+                    start_results = results.get("start", {})
+                    if isinstance(start_results, dict):
+                        start_results["input"] = last_human.content
+                        results["start"] = start_results
             
             return {
                 "agent_data": {
@@ -284,9 +302,10 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 graph.add_edge(hop_id, entry_for[dest_id])
             else:
                 # Fan-in: single gather node.
-                # All source worker exits feed into it; LangGraph waits for
-                # every predecessor before running the gather.  Workers
-                # themselves still execute in parallel.
+                # All source worker exits feed into it.  For DAG fan-in,
+                # LangGraph waits for every predecessor before running the
+                # gather.  For cycles, LangGraph only waits for predecessors
+                # activated in the current super-step (no deadlock).
                 gather_id = _safe_id("__gather__", dest_id)
                 graph.add_node(gather_id, _make_gather(dest_edges, dest_id))
                 for src_exit in source_exits:

@@ -6,14 +6,14 @@ logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from langchain_core.tools import tool
 
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.google_address_validation.models import (
+from kgraphplanner.vital_agent_rest_resource_client.tools.google_address_validation.models import (
     AddressValidationInput, 
     AddressValidationOutput
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
+from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
     VitalAgentRestResourceClient
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
+from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
 
@@ -37,7 +37,7 @@ class AddressValidationTool(AbstractTool):
         """Get the tool function for address validation."""
         
         @tool(args_schema=AddressValidationInput)
-        def google_address_validation_tool(address: str) -> AddressValidationOutput:
+        async def google_address_validation_tool(address: str) -> AddressValidationOutput:
             """
             Validate and standardize postal addresses.
             
@@ -73,8 +73,8 @@ class AddressValidationTool(AbstractTool):
             client = VitalAgentRestResourceClient(client_config, jwt_token)
             
             try:
-                # Execute the validation
-                tool_response = client.handle_tool_request(ToolNameEnum.google_address_validation_tool.value, address_validation_input)
+                # Execute the validation (async)
+                tool_response = await client.handle_tool_request(ToolNameEnum.google_address_validation_tool.value, address_validation_input)
                 
                 # Extract results - should be AddressValidationOutput
                 address_validation_results: AddressValidationOutput = tool_response.tool_output

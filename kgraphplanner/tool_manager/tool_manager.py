@@ -1,32 +1,30 @@
 import logging
+import contextvars
 from typing import Dict, List, Optional, Any
 from pathlib import Path
+
+# Request-scoped JWT token — set per async task / request context.
+# Falls back to the instance-level token when not set.
+_request_jwt: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar('_request_jwt', default=None)
 
 logger = logging.getLogger(__name__)
 
 from kgraphplanner.config.agent_config import AgentConfig
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
+from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 
 class ToolManager:
     """Manages tools for KGraphPlanner agents."""
     
-    def __init__(self, *, config: Optional[AgentConfig] = None, config_path: Optional[str] = None):
+    def __init__(self, *, config: Optional[AgentConfig] = None):
         """
         Initialize the tool manager.
         
         Args:
-            config: An AgentConfig instance (preferred for programmatic use).
-            config_path: Path to a YAML configuration file (backward-compatible).
-                         Ignored when *config* is provided.
+            config: An AgentConfig instance. If not provided, uses defaults.
         """
-        if config is not None:
-            self.config = config
-        elif config_path:
-            self.config = AgentConfig.from_yaml(config_path)
-        else:
-            self.config = AgentConfig()
+        self.config = config if config is not None else AgentConfig()
         self.tools: Dict[str, AbstractTool] = {}
         self._tool_functions = {}
         self._jwt_token: Optional[str] = None
@@ -116,6 +114,9 @@ class ToolManager:
                 elif tool_name == ToolNameEnum.weather_tool.value:
                     from kgraphplanner.tools.weather.weather_tool import WeatherTool
                     weather_tool = WeatherTool(individual_tool_config, self)
+                elif tool_name == "knowledge_search_tool":
+                    from kgraphplanner.tools.knowledge.knowledge_search_tool import KnowledgeSearchTool
+                    knowledge_tool = KnowledgeSearchTool(individual_tool_config, self)
             except ImportError as e:
                 logger.warning(f"Could not load tool '{tool_name}': {e}")
     
@@ -135,20 +136,30 @@ class ToolManager:
         """
         Set the JWT token for use with vital resource REST service clients.
         
+        When running inside an async event loop this sets a request-scoped
+        token via ``contextvars`` so concurrent requests don't overwrite
+        each other.  The instance-level ``_jwt_token`` is kept as a
+        fallback for sync callers.
+        
         Args:
             jwt_token: JWT token string to use for authentication
         """
+        _request_jwt.set(jwt_token)
         self._jwt_token = jwt_token
     
     def get_jwt_token(self) -> Optional[str]:
         """
         Get the current JWT token.
         
+        Prefers the request-scoped contextvar token (safe for concurrent
+        async requests) and falls back to the instance-level token.
+        
         Returns:
             JWT token string or None if not set
         """
-        return self._jwt_token
+        return _request_jwt.get() or self._jwt_token
     
     def clear_jwt_token(self) -> None:
-        """Clear the current JWT token."""
+        """Clear the current JWT token (both contextvar and instance)."""
+        _request_jwt.set(None)
         self._jwt_token = None

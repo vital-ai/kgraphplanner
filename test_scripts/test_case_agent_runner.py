@@ -25,14 +25,34 @@ import logging
 
 from test_scripts.cases.test_result import TestResult, run_case
 
-logging.basicConfig(level=logging.DEBUG, format="%(name)s - %(levelname)s - %(message)s")
-for _name in ("httpx", "httpcore", "openai", "urllib3"):
+import datetime as _dt
+
+_log_dir = os.path.join(project_root, "test_output")
+os.makedirs(_log_dir, exist_ok=True)
+_log_ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+_log_file = os.path.join(_log_dir, f"agent_runner_{_log_ts}.log")
+
+_file_handler = logging.FileHandler(_log_file, mode="w")
+_file_handler.setFormatter(logging.Formatter("%(asctime)s %(name)s - %(levelname)s - %(message)s"))
+# Flush after every log record so data survives process kills
+_file_handler.stream.reconfigure(write_through=True)
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        _file_handler,
+    ],
+)
+for _name in ("httpx", "httpcore", "openai", "anthropic", "urllib3"):
     logging.getLogger(_name).setLevel(logging.WARNING)
 
 # Registry: (short_key, module_path, display_name)
 CASES = [
     ("case_agent",   "test_scripts.cases.case_case_agent",   "Case Agent Routing"),
     ("case_worker",  "test_scripts.cases.case_case_worker",  "Case Worker"),
+    ("sales_agent",  "test_scripts.cases.case_sales_agent",  "Sales Agent Pipeline"),
 ]
 
 

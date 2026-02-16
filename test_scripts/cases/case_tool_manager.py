@@ -3,7 +3,7 @@ Case: ToolManager — registration, config loading, tool functions, integration.
 
 Tests the ToolManager's ability to:
   1. Register tools and retrieve them by name
-  2. Load configuration from YAML and from environment variables
+  2. Load configuration from dicts and environment variables
   3. Create tool functions for LangChain
   4. Full integration with config-driven tool loading
 """
@@ -58,42 +58,32 @@ def _test_basic(buf: io.StringIO) -> bool:
 
 
 def _test_config_loading(buf: io.StringIO) -> bool:
-    """Test configuration loading."""
+    """Test configuration loading from dict."""
     log(buf, "\n  --- Config Loading ---")
 
-    test_config_path = "/tmp/test_agent_config_runner.yaml"
-    test_config_content = """
-tools:
-  endpoint: "http://localhost:8008"
-  enabled:
-    - google_web_search_tool
-  web_search:
-    default_num_results: 10
+    config = AgentConfig.from_dict({
+        "tools": {
+            "endpoint": "http://localhost:8008",
+            "enabled": ["google_web_search_tool"],
+            "web_search": {"default_num_results": 10},
+        },
+        "agent": {"name": "Test Agent"},
+    })
 
-agent:
-  name: "Test Agent"
-"""
-    with open(test_config_path, 'w') as f:
-        f.write(test_config_content)
+    tm = ToolManager(config=config)
 
-    try:
-        tm = ToolManager(config_path=test_config_path)
+    assert tm.config.get_tool_endpoint() == "http://localhost:8008"
+    log(buf, "  ✓ Endpoint config")
 
-        assert tm.config.get_tool_endpoint() == "http://localhost:8008"
-        log(buf, "  ✓ Endpoint config")
+    assert tm.config.get_enabled_tools() == ["google_web_search_tool"]
+    log(buf, "  ✓ Enabled tools config")
 
-        assert tm.config.get_enabled_tools() == ["google_web_search_tool"]
-        log(buf, "  ✓ Enabled tools config")
+    assert tm.config.name == "Test Agent"
+    log(buf, "  ✓ Agent name config")
 
-        assert tm.config.name == "Test Agent"
-        log(buf, "  ✓ Agent name config")
-
-        tm.load_tools_from_config()
-        assert "google_web_search_tool" in tm.list_available_tools()
-        log(buf, "  ✓ Tools loaded from config")
-
-    finally:
-        os.unlink(test_config_path)
+    tm.load_tools_from_config()
+    assert "google_web_search_tool" in tm.list_available_tools()
+    log(buf, "  ✓ Tools loaded from config")
 
     log(buf, "  ✅ Config Loading: passed")
     return True
@@ -175,32 +165,21 @@ def _test_websearch_props(buf: io.StringIO) -> bool:
 
 
 def _test_integration(buf: io.StringIO) -> bool:
-    """Test full integration with config template."""
+    """Test full integration with env-based config."""
     log(buf, "\n  --- Integration ---")
 
-    template_path = os.path.join(project_root, "agent_config.yaml.template")
-    test_config_path = "/tmp/integration_test_config_runner.yaml"
+    config = AgentConfig.from_env()
+    tm = ToolManager(config=config)
+    tm.load_tools_from_config()
 
-    with open(template_path, 'r') as f:
-        config_content = f.read()
-    with open(test_config_path, 'w') as f:
-        f.write(config_content)
+    available = tm.list_available_tools()
+    enabled = tm.get_enabled_tools()
+    log(buf, f"  Available: {available}")
+    log(buf, f"  Enabled: {[t.get_tool_name() for t in enabled]}")
 
-    try:
-        tm = ToolManager(config_path=test_config_path)
-        tm.load_tools_from_config()
-
-        available = tm.list_available_tools()
-        enabled = tm.get_enabled_tools()
-        log(buf, f"  Available: {available}")
-        log(buf, f"  Enabled: {[t.get_tool_name() for t in enabled]}")
-
-        tool_fns = tm.get_enabled_tool_functions()
-        assert len(tool_fns) > 0, "No tool functions"
-        log(buf, f"  ✓ {len(tool_fns)} tool functions ready for LangChain")
-
-    finally:
-        os.unlink(test_config_path)
+    tool_fns = tm.get_enabled_tool_functions()
+    assert len(tool_fns) > 0, "No tool functions"
+    log(buf, f"  ✓ {len(tool_fns)} tool functions ready for LangChain")
 
     log(buf, "  ✅ Integration: passed")
     return True

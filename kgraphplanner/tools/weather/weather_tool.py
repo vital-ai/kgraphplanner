@@ -6,14 +6,14 @@ logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from langchain_core.tools import tool
 
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.models import (
+from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import (
     WeatherInput, 
     WeatherOutput
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
+from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
     VitalAgentRestResourceClient
 )
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
+from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
 
@@ -37,7 +37,7 @@ class WeatherTool(AbstractTool):
         """Get the tool function for weather."""
         
         @tool(args_schema=WeatherInput)
-        def weather_tool(latitude: float, longitude: float, place_label: str = "", 
+        async def weather_tool(latitude: float, longitude: float, place_label: str = "", 
                         include_previous: bool = False, use_archive: bool = False, 
                         archive_date: str = "") -> WeatherOutput:
             """
@@ -69,7 +69,7 @@ class WeatherTool(AbstractTool):
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
                 # Return error in WeatherOutput format for consistency
-                from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.models import WeatherData
+                from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import WeatherData
                 error_weather_data = WeatherData(
                     latitude=latitude,
                     longitude=longitude,
@@ -96,8 +96,8 @@ class WeatherTool(AbstractTool):
             client = VitalAgentRestResourceClient(client_config, jwt_token)
             
             try:
-                # Execute the weather request
-                tool_response = client.handle_tool_request(ToolNameEnum.weather_tool.value, weather_input)
+                # Execute the weather request (async)
+                tool_response = await client.handle_tool_request(ToolNameEnum.weather_tool.value, weather_input)
                 
                 # Extract results - should be WeatherOutput
                 weather_results: WeatherOutput = tool_response.tool_output
@@ -106,7 +106,7 @@ class WeatherTool(AbstractTool):
                 
             except Exception as e:
                 logger.warning(f"Weather tool error: {e}")
-                from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.weather.models import WeatherData
+                from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import WeatherData
                 error_weather_data = WeatherData(
                     latitude=latitude,
                     longitude=longitude,

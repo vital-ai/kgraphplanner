@@ -60,7 +60,7 @@ async def run() -> TestResult:
 
     # Check tool infrastructure first
     try:
-        tm = create_tool_manager()
+        tm = await create_tool_manager()
         available = tm.list_available_tools()
         _log(buf, f"  Available tools: {available}")
     except Exception as e:

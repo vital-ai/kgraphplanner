@@ -5,7 +5,8 @@ from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 
 from langgraph.graph import StateGraph
-from langchain_openai import ChatOpenAI
+from langgraph.types import interrupt
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langchain_core.messages import BaseMessage
 
@@ -23,7 +24,7 @@ class KGraphWorker(ABC):
     """
     
     name: str
-    llm: ChatOpenAI
+    llm: BaseChatModel
     system_directive: str = ""
     required_inputs: Optional[List[str]] = None
     max_iters: int = 6
@@ -66,6 +67,34 @@ class KGraphWorker(ABC):
         # Return a fresh slot (not attached to state)
         return {"iters": 0, "messages": []}
     
+    def _resolve_system_directive(self, args: Dict[str, Any]) -> str:
+        """Resolve the effective system directive for this invocation.
+
+        If the activation *args* contain a ``system_directive`` key its
+        value **replaces** the worker's static :pyattr:`system_directive`.
+        If a ``system_directive_append`` key is present its value is
+        **appended** to the effective directive (separated by two
+        newlines).  Both keys are consumed (removed from *args*) so they
+        are not forwarded to the LLM as regular arguments.
+
+        When neither key is present the worker's static directive is
+        returned unchanged — fully backward-compatible.
+        """
+        directive = self.system_directive
+
+        override = args.pop("system_directive", None)
+        if override:
+            directive = str(override)
+
+        append = args.pop("system_directive_append", None)
+        if append:
+            if directive:
+                directive = f"{directive}\n\n{str(append)}"
+            else:
+                directive = str(append)
+
+        return directive
+
     def _get_activation(self, state: Dict[str, Any], occurrence_id: str) -> Dict[str, Any]:
         """
         Get the activation data for this worker occurrence.
@@ -92,3 +121,38 @@ class KGraphWorker(ABC):
                 "results": {occurrence_id: payload},
             }
         }
+    
+    def request_human_input(
+        self,
+        question: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+        options: Optional[List[str]] = None,
+    ) -> Any:
+        """
+        Pause the graph and ask the human for input.
+        
+        Calls LangGraph's interrupt() which serializes the graph state and
+        returns the payload to the caller.  When the caller invokes
+        Command(resume=value), interrupt() returns that value here and
+        execution continues from this point.
+        
+        Args:
+            question: The question to present to the user.
+            context: Optional dict of context (e.g., what failed, what was tried).
+            options: Optional list of suggested responses.
+            
+        Returns:
+            The user's reply when the graph resumes via Command(resume=...).
+        """
+        payload: Dict[str, Any] = {
+            "type": "human_input_request",
+            "worker": self.name,
+            "question": question,
+        }
+        if context:
+            payload["context"] = context
+        if options:
+            payload["options"] = options
+        
+        return interrupt(payload)
