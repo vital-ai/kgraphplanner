@@ -73,6 +73,19 @@ class WebSearchOutput(BaseModel):
     related_questions: Optional[List[RelatedQuestion]] = Field(None, description="Related questions")
     search_information: Optional[dict] = Field(None, description="Search metadata and information")
 
+    def compact_dump(self) -> dict:
+        """Return a compact dict with all None/null fields stripped."""
+        data = self.model_dump(exclude_none=True)
+        # Also strip search_information metadata — not useful for LLM
+        data.pop("search_information", None)
+        # Strip None fields from nested result dicts
+        if "results" in data:
+            data["results"] = [
+                {k: v for k, v in r.items() if v is not None}
+                for r in data["results"]
+            ]
+        return data
+
     model_config = {
         "json_schema_extra": {
             "example": {

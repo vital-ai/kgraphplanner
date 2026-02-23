@@ -30,6 +30,7 @@ class EdgeSpec(BaseModel):
     bindings: Dict[str, List[Binding]] = Field(default_factory=dict)
     merge: Literal["edge_overrides", "node_defaults_then_edge", "accumulate"] = "edge_overrides"
     condition: Optional[str] = None  # Condition expression for conditional routing
+    max_traversals: Optional[int] = None  # Max times this edge can be traversed before loop guard kicks in
 
 
 # ============================================================

@@ -36,6 +36,8 @@ dependencies = [
     "python-dotenv",
     "rich>=13.7.1",
     "pyyaml",
+    "vital-agentbox[client]>=0.1.1",
+    "deepagents>=0.4.3",
 ]
 
 [project.optional-dependencies]

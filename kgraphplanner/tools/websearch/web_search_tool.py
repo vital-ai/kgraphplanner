@@ -1,4 +1,5 @@
 import logging
+import traceback
 from typing import Callable, Type
 import json
 
@@ -110,8 +111,9 @@ class WebSearchTool(AbstractTool):
                 return web_search_results
                 
             except Exception as e:
-                logger.warning(f"Web search tool error: {e}")
-                return f"No web search results available for query: {search_query} (error: {e})"
+                logger.warning(f"Web search tool error ({type(e).__name__}): {e}")
+                logger.warning(f"Web search tool traceback:\n{traceback.format_exc()}")
+                return f"No web search results available for query: {search_query} (error: {type(e).__name__}: {e})"
         
         return google_web_search_tool
     

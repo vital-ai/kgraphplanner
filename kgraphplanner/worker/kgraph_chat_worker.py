@@ -203,6 +203,9 @@ class KGraphChatWorker(KGraphWorker):
                 total_tok = usage.get('total_tokens', '?')
                 if total_tok == '?' and prompt_tok != '?' and compl_tok != '?':
                     total_tok = prompt_tok + compl_tok
+                # Extract reasoning tokens from completion_tokens_details
+                ctd = usage.get('completion_tokens_details') or {}
+                reasoning_tok = ctd.get('reasoning_tokens', '?') if isinstance(ctd, dict) else '?'
                 finish = meta.get('finish_reason', meta.get('stop_reason', '?'))
                 model_id = meta.get('model_name', meta.get('model', '?'))
                 logger.info(
@@ -211,6 +214,7 @@ class KGraphChatWorker(KGraphWorker):
                     f"model={model_id}  "
                     f"prompt_tokens={prompt_tok}  "
                     f"completion_tokens={compl_tok}  "
+                    f"reasoning_tokens={reasoning_tok}  "
                     f"total_tokens={total_tok}"
                 )
 
@@ -218,13 +222,13 @@ class KGraphChatWorker(KGraphWorker):
                 if not result_text or len(result_text) < 10:
                     logger.warning(
                         f"⚠️ Chat worker '{occurrence_id}' got empty/short response "
-                        f"(len={len(result_text)}). raw_content repr: {repr(raw_content)[:500]}"
+                        f"(len={len(result_text)}). raw_content repr: {repr(raw_content)}"
                     )
                     # Dump all response attributes for diagnosis
                     for attr in ('content', 'additional_kwargs', 'response_metadata',
                                  'tool_calls', 'invalid_tool_calls', 'usage_metadata'):
                         val = getattr(response, attr, '<missing>')
-                        logger.warning(f"  response.{attr} = {repr(val)[:300]}")
+                        logger.warning(f"  response.{attr} = {repr(val)}")
                 
                 writer({
                     "phase": "chat_complete",

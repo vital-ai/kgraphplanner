@@ -319,6 +319,7 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             # Create a hop node for each branch destination
             route_map: Dict[str, str] = {}  # route_key → hop_node_id
             default_key = None
+            loop_guard_key = None  # set if any edge has max_traversals
             
             for i, e in enumerate(cond_edges):
                 dest_id = e.destination
@@ -330,25 +331,100 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 route_map[route_key] = hop_id
                 if e.condition == "__default__":
                     default_key = route_key
+                
+                # For any edge with max_traversals, create a loop-guard
+                # self-loop hop that routes back to the SOURCE so the chat
+                # worker gets one final turn to compose its answer.
+                if e.max_traversals is not None and loop_guard_key is None:
+                    lg_hop_id = _safe_id("__loop_guard__", source_id)
+                    src_node = by_id.get(source_id)
+                    src_defaults = {}
+                    if isinstance(src_node, WorkerNodeSpec):
+                        src_defaults = src_node.defaults or {}
+                    
+                    def _make_loop_guard_hop(src_id, src_defs):
+                        def loop_guard_hop(state: AgentState) -> AgentState:
+                            agent_data = dict(state.get("agent_data", {}))
+                            activation_map = dict(agent_data.get("activation", {}))
+                            results = agent_data.get("results", {})
+                            
+                            # Collect whatever tool results exist
+                            tool_results_summary = ""
+                            for node_id, res in results.items():
+                                if node_id != src_id and isinstance(res, dict):
+                                    rt = res.get("result_text", "")
+                                    if rt:
+                                        tool_results_summary += f"\n{node_id}: {rt}"
+                            
+                            activation_map[src_id] = {
+                                "prompt": (
+                                    "IMPORTANT: You have reached the maximum number of "
+                                    "tool call cycles. You MUST NOT request any more "
+                                    "tool calls. Compose your final answer NOW using "
+                                    "action=\"respond\" based on the tool results you "
+                                    "have already gathered."
+                                ),
+                                "args": {
+                                    **src_defs.get("args", {}),
+                                    "tool_results_so_far": tool_results_summary,
+                                },
+                            }
+                            
+                            return {
+                                "agent_data": {
+                                    **agent_data,
+                                    "activation": activation_map,
+                                }
+                            }
+                        return loop_guard_hop
+                    
+                    graph.add_node(lg_hop_id, _make_loop_guard_hop(source_id, src_defaults))
+                    graph.add_edge(lg_hop_id, entry_for[source_id])
+                    loop_guard_key = "__loop_guard__"
+                    route_map[loop_guard_key] = lg_hop_id
+                    logger.info(f"Loop guard branch added for '{source_id}' "
+                               f"(max_traversals={e.max_traversals})")
             
-            # Build condition list for the router (excluding default)
+            # Build condition list for the router (excluding default).
+            # Each entry: (route_key, condition_expr, max_traversals_or_None, dest_id)
             branch_conditions = []
             for i, e in enumerate(cond_edges):
                 if e.condition != "__default__":
-                    branch_conditions.append((f"branch_{i}", e.condition))
+                    branch_conditions.append(
+                        (f"branch_{i}", e.condition, e.max_traversals, e.destination)
+                    )
             
             # Create the router function
             src_id_captured = source_id
             conditions_captured = list(branch_conditions)
             default_captured = default_key
+            loop_guard_captured = loop_guard_key
             
-            def _make_router(src_id, conditions, default_route):
+            def _make_router(src_id, conditions, default_route, loop_guard_route):
+                # Closure-level counter — persists across router calls
+                # within the same compiled graph instance.
+                _edge_counts: Dict[str, int] = {}
+                
                 def router(state: AgentState) -> str:
                     results = state.get("agent_data", {}).get("results", {})
                     result = results.get(src_id, {})
                     
-                    for route_key, condition in conditions:
+                    for route_key, condition, max_trav, dest_id in conditions:
                         if _evaluate_condition(condition, result):
+                            # Check max_traversals loop guard
+                            if max_trav is not None:
+                                edge_key = f"{src_id}→{dest_id}"
+                                count = _edge_counts.get(edge_key, 0) + 1
+                                _edge_counts[edge_key] = count
+                                
+                                if count > max_trav and loop_guard_route:
+                                    logger.warning(
+                                        f"⚠️ Loop guard: edge '{src_id}' → '{dest_id}' "
+                                        f"hit max_traversals ({max_trav}). "
+                                        f"Routing back to '{src_id}' for final response."
+                                    )
+                                    return loop_guard_route
+                            
                             logger.info(f"Conditional routing '{src_id}': "
                                        f"condition '{condition}' matched → {route_key}")
                             return route_key
@@ -366,7 +442,8 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 return router
             
             router_fn = _make_router(
-                src_id_captured, conditions_captured, default_captured
+                src_id_captured, conditions_captured,
+                default_captured, loop_guard_captured,
             )
             
             graph.add_conditional_edges(
@@ -377,7 +454,8 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             
             logger.info(f"Conditional routing for '{source_id}': "
                        f"{len(cond_edges)} branches, "
-                       f"default={'yes' if default_key else 'no'}")
+                       f"default={'yes' if default_key else 'no'}, "
+                       f"loop_guard={'yes' if loop_guard_key else 'no'}")
         
         # --- 5. Connect exit nodes to END ---
         connected_to_end: set = set()
@@ -413,6 +491,14 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             "work": {}
         }
         
+        # Raise the recursion limit from the default 25 to support
+        # multi-step planning loops (each orchestrator ↔ tool_executor
+        # round trip traverses ~10+ graph nodes).
+        if config and "recursion_limit" not in config:
+            config["recursion_limit"] = 100
+        elif not config:
+            config = {"recursion_limit": 100}
+
         result = await compiled_graph.ainvoke(initial_state, config=config)
         return result
     

@@ -251,7 +251,7 @@ class KGraphCaseAgent(KGraphBaseAgent):
                 # Return current state to allow more processing
                 return state
             
-            logger.debug(f"Resolve setup - proceeding with worker_output: {str(worker_output)[:100]}...")
+            logger.debug(f"Resolve setup - proceeding with worker_output: {str(worker_output)}")
             
             # Set up activation for resolve worker
             activation = agent_data.get("activation", {})

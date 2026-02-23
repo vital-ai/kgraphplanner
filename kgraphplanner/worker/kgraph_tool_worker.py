@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any, Tuple, List, Optional, Literal, Type
 from dataclasses import dataclass, field
+import hashlib
 import json
 import asyncio
 import time
@@ -34,6 +35,7 @@ class KGraphToolWorker(KGraphWorker):
     
     tool_manager: Any = None
     available_tool_ids: List[str] = field(default_factory=list)
+    summarization_llm: Any = None  # Optional separate LLM for summarization (e.g. low reasoning)
     
     def __post_init__(self):
         """Initialize after dataclass creation."""
@@ -42,6 +44,8 @@ class KGraphToolWorker(KGraphWorker):
             raise ValueError("tool_manager must be provided to KGraphToolWorker")
         if not self.available_tool_ids:
             raise ValueError("available_tool_ids must be provided and non-empty")
+        if self.summarization_llm is None:
+            self.summarization_llm = self.llm
     
     def get_available_tools(self) -> Dict[str, BaseTool]:
         """Get tools that are available to this worker based on tool IDs."""
@@ -103,6 +107,24 @@ class KGraphToolWorker(KGraphWorker):
             # Check if we have activation data or tool results to work with
             slot = self._get_worker_slot(state, occurrence_id)
             
+            # Detect new activation: if the activation args changed since
+            # last time, reset iters and tool_history so each orchestrator →
+            # tool_executor round trip gets a fresh iteration budget.
+            activation_key = hashlib.md5(
+                json.dumps(args, sort_keys=True, default=str).encode()
+            ).hexdigest()
+            if slot.get("_activation_key") != activation_key:
+                logger.debug(
+                    f"Tool worker '{occurrence_id}' new activation detected "
+                    f"(key {slot.get('_activation_key', 'None')} → {activation_key}), "
+                    f"resetting iters from {slot.get('iters', 0)}"
+                )
+                slot["iters"] = 0
+                slot["tool_history"] = []
+                slot["_summaries"] = {}
+                slot.pop("pending_ai_message", None)
+                slot["_activation_key"] = activation_key
+            
             # Check for tool results in THIS worker's own tool_history
             tool_history = slot.get("tool_history", [])
             has_tool_results = len(tool_history) > 0
@@ -143,12 +165,12 @@ class KGraphToolWorker(KGraphWorker):
                 
                 logger.debug(f"Generating final answer with {len(messages)} messages")
                 
-                # Call LLM to generate final answer
+                # Call summarization LLM to generate final answer
                 try:
-                    response = await self.llm.ainvoke(messages)
+                    response = await self.summarization_llm.ainvoke(messages)
                     final_answer = response.content if hasattr(response, 'content') else str(response)
                     
-                    logger.debug(f"Generated final answer: {final_answer[:100]}...")
+                    logger.debug(f"Generated final answer: {final_answer}")
                     
                     slot["last_decision"] = {
                         "type": "final",
@@ -225,7 +247,7 @@ class KGraphToolWorker(KGraphWorker):
                 ))
                 try:
                     _t_sum = time.time()
-                    summary_response = await self.llm.ainvoke(summary_messages)
+                    summary_response = await self.summarization_llm.ainvoke(summary_messages)
                     _t_sum_done = time.time()
                     answer = getattr(summary_response, 'content', '') or ''
                     logger.info(
@@ -259,21 +281,42 @@ class KGraphToolWorker(KGraphWorker):
             if prompt:
                 messages.append(SystemMessage(content=f"Task instructions: {prompt}"))
             
-            # Add the user's request as a human message
+            # Add the user's request as a human message.
+            # Strip orchestrator-internal fields so the tool worker only
+            # sees tool-specific data (tool, query, requests).
+            _STRIP_KEYS = {"action", "plan", "result_text", "args_used", "answer", "previous_plan"}
+            
+            def _clean_tool_args(raw_args: dict) -> dict:
+                cleaned = {}
+                for k, v in raw_args.items():
+                    if k in _STRIP_KEYS:
+                        continue
+                    # If the value is a JSON string, try to parse and clean it too
+                    if isinstance(v, str):
+                        try:
+                            parsed = json.loads(v)
+                            if isinstance(parsed, dict):
+                                parsed = {pk: pv for pk, pv in parsed.items() if pk not in _STRIP_KEYS}
+                                cleaned[k] = json.dumps(parsed, default=str)
+                                continue
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    cleaned[k] = v
+                return cleaned
+            
             logger.debug(f"Args received: {args}")
             if args and "request" in args:
                 messages.append(HumanMessage(content=args["request"]))
                 logger.debug(f"Added user request from args['request']")
             elif prompt or args:
-                # Construct a request from prompt + args when no explicit 'request' key
-                parts = []
-                if prompt:
-                    parts.append(prompt)
-                if args:
-                    parts.append(f"Context: {json.dumps(args, default=str)}")
-                request_text = "\n".join(parts)
-                messages.append(HumanMessage(content=request_text))
-                logger.debug(f"Constructed user request from prompt+args ({len(request_text)} chars)")
+                clean_args = _clean_tool_args(args) if args else {}
+                request_text = json.dumps(clean_args, default=str) if clean_args else ""
+                if request_text:
+                    messages.append(HumanMessage(content=request_text))
+                    logger.debug(f"Constructed user request from cleaned args ({len(request_text)} chars)")
+                elif prompt:
+                    messages.append(HumanMessage(content=prompt))
+                    logger.debug(f"Constructed user request from prompt ({len(prompt)} chars)")
             else:
                 logger.debug("No request, prompt, or args available")
             
@@ -289,12 +332,14 @@ class KGraphToolWorker(KGraphWorker):
             
             # Add guidance for decision making
             if slot["iters"] == 1:
-                messages.append(SystemMessage(content="""You have access to tools to help answer questions. Use the available tools when needed, or provide a direct answer if no tools are required.
-
-If you need to use a tool, call the appropriate function with the required parameters.
-If you have enough information to answer directly, provide your response without using tools."""))
+                messages.append(SystemMessage(content="Execute ONLY the tool call(s) specified in the request above. Do NOT call any tools beyond what was explicitly requested."))
             else:
-                messages.append(SystemMessage(content=f"This is iteration {slot['iters']}. If tools are failing or you have enough information, provide a final answer instead of retrying tools."))
+                messages.append(SystemMessage(content=(
+                    f"Iteration {slot['iters']}. "
+                    "If all requested tools have returned results, respond with ONLY a JSON object listing the tool_call_ids to include in the final answer, e.g.:\n"
+                    '{"include_summaries": ["call_abc", "call_def"]}\n'
+                    "Do NOT restate or summarize the results yourself. If tools are still pending, make the remaining calls."
+                )))
             
             # Add conversation history from THIS worker's own tool_history
             # (isolated per-occurrence to prevent cross-contamination between parallel workers)
@@ -336,24 +381,27 @@ If you have enough information to answer directly, provide your response without
 
                 meta = getattr(response, 'response_metadata', {}) or {}
                 usage = meta.get('token_usage') or meta.get('usage', {})
+                ctd = usage.get('completion_tokens_details') or {}
+                reasoning_tok = ctd.get('reasoning_tokens', '?') if isinstance(ctd, dict) else '?'
                 logger.info(
                     f"📊 Tool worker '{occurrence_id}' "
                     f"finish_reason={meta.get('finish_reason', '?')}  "
                     f"model={meta.get('model_name', meta.get('model', '?'))}  "
                     f"prompt_tokens={usage.get('prompt_tokens', '?')}  "
                     f"completion_tokens={usage.get('completion_tokens', '?')}  "
+                    f"reasoning_tokens={reasoning_tok}  "
                     f"total_tokens={usage.get('total_tokens', '?')}"
                 )
 
                 if not raw_content and tool_calls_count == 0:
                     logger.warning(
                         f"⚠️ Tool worker '{occurrence_id}' got empty response with no tool calls. "
-                        f"raw_content repr: {repr(raw_content)[:500]}"
+                        f"raw_content repr: {repr(raw_content)}"
                     )
                     for attr in ('content', 'additional_kwargs', 'response_metadata',
                                  'tool_calls', 'invalid_tool_calls', 'usage_metadata'):
                         val = getattr(response, attr, '<missing>')
-                        logger.warning(f"  response.{attr} = {repr(val)[:300]}")
+                        logger.warning(f"  response.{attr} = {repr(val)}")
                 
                 # Process LLM response and determine action
                 decision = self._process_llm_response(response, slot)
@@ -399,49 +447,38 @@ If you have enough information to answer directly, provide your response without
             
             logger.debug(f"Found AIMessage with {len(ai_message_with_tools.tool_calls)} tool calls")
             
-            # Execute all tool calls and collect ToolMessages
-            tool_messages = []
+            # Execute all tool calls in parallel using asyncio.gather
+            tool_calls = ai_message_with_tools.tool_calls
+            activation = self._get_activation(state, occurrence_id)
+            n_calls = len(tool_calls)
             
-            for i, tool_call in enumerate(ai_message_with_tools.tool_calls):
+            # Shared dict for per-result summaries (written by _execute_one)
+            summaries: Dict[str, str] = {}
+
+            async def _execute_one(i: int, tool_call: dict) -> ToolMessage:
+                """Execute a single tool call, summarize the result, and return a lightweight ToolMessage."""
                 tool_call_id = tool_call['id']
                 tool_name = tool_call['name']
                 tool_args = tool_call.get('args', {})
-                
-                logger.info(f"🔧 Tool call {i+1}/{len(ai_message_with_tools.tool_calls)} for '{occurrence_id}': {tool_name} args={tool_args}")
-                
+
+                logger.info(f"🔧 Tool call {i+1}/{n_calls} for '{occurrence_id}': {tool_name} args={tool_args}")
+
                 # Validate tool exists
                 if tool_name not in self.available_tool_ids:
                     error_msg = f"Tool '{tool_name}' not available. Available tools: {self.available_tool_ids}"
-                    tool_message = ToolMessage(
-                        content=error_msg,
-                        tool_call_id=tool_call_id,
-                        name=tool_name
-                    )
-                    tool_messages.append(tool_message)
                     logger.debug(f"Tool {tool_name} not found, added error message")
-                    continue
-                
-                # Get tool object and execute
+                    return ToolMessage(content=error_msg, tool_call_id=tool_call_id, name=tool_name)
+
                 tool_obj = self.tool_manager.get_tool(tool_name)
                 if not tool_obj:
                     error_msg = f"Tool '{tool_name}' object not found in manager"
-                    tool_message = ToolMessage(
-                        content=error_msg,
-                        tool_call_id=tool_call_id,
-                        name=tool_name
-                    )
-                    tool_messages.append(tool_message)
                     logger.debug(f"Tool object {tool_name} not found, added error message")
-                    continue
-                
+                    return ToolMessage(content=error_msg, tool_call_id=tool_call_id, name=tool_name)
+
                 try:
-                    # Get tool function and execute
                     tool_func = tool_obj.get_tool_function()
-                    activation = self._get_activation(state, occurrence_id)
-                    
-                    # Coerce tool arguments
                     args = self._coerce_tool_args(tool_func, tool_args, activation.get("args", {}))
-                    
+
                     logger.info(f"🔍 [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' query: {args}")
                     _t_tool = time.time()
                     result = await tool_func.ainvoke(args)
@@ -450,38 +487,78 @@ If you have enough information to answer directly, provide your response without
                         f"⏱️ [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' "
                         f"took {_t_tool_elapsed:.1f}s  result:\n{result}"
                     )
-                    
-                    # Convert result to JSON string for tool message content
+
+                    # Convert result to string via compact_dump() when available.
                     try:
-                        if hasattr(result, 'model_dump'):
-                            result_json = json.dumps(result.model_dump(), indent=2)
+                        if hasattr(result, 'compact_dump'):
+                            compact = result.compact_dump()
+                            if isinstance(compact, str):
+                                result_text = compact
+                            else:
+                                result_text = json.dumps(compact, indent=2)
+                        elif hasattr(result, 'model_dump'):
+                            result_text = json.dumps(result.model_dump(), indent=2)
                         elif hasattr(result, 'dict'):
-                            result_json = json.dumps(result.dict(), indent=2)
+                            result_text = json.dumps(result.dict(), indent=2)
                         else:
-                            result_json = json.dumps(str(result), indent=2)
-                        result_text = result_json
+                            result_text = json.dumps(str(result), indent=2)
                     except Exception as json_error:
                         logger.debug(f"JSON serialization failed: {json_error}")
                         result_text = str(result)
+
+                    # --- Per-result summarization via summarization_llm ---
+                    summary_text = None
+                    try:
+                        _t_sum = time.time()
+                        sum_msgs = [
+                            SystemMessage(content="Summarize the following tool result into a concise, natural-language answer. Return ONLY the summary."),
+                            HumanMessage(content=result_text),
+                        ]
+                        sum_resp = await self.summarization_llm.ainvoke(sum_msgs)
+                        summary_text = getattr(sum_resp, 'content', '') or ''
+                        _sum_elapsed = time.time() - _t_sum
+                        
+                        meta = getattr(sum_resp, 'response_metadata', {}) or {}
+                        usage = meta.get('token_usage') or meta.get('usage', {})
+                        ctd = usage.get('completion_tokens_details') or {}
+                        reasoning_tok = ctd.get('reasoning_tokens', '?') if isinstance(ctd, dict) else '?'
+                        logger.info(
+                            f"📝 [{time.strftime('%H:%M:%S')}] Summarized '{tool_name}' for '{occurrence_id}' "
+                            f"in {_sum_elapsed:.1f}s  summary_len={len(summary_text)}  "
+                            f"prompt_tokens={usage.get('prompt_tokens', '?')}  "
+                            f"completion_tokens={usage.get('completion_tokens', '?')}  "
+                            f"reasoning_tokens={reasoning_tok}"
+                        )
+                    except Exception as sum_err:
+                        logger.warning(f"Summarization failed for '{tool_name}': {sum_err}")
+                        summary_text = result_text  # fallback: use raw compact data
                     
-                    # Create ToolMessage
-                    tool_message = ToolMessage(
-                        content=result_text,
-                        tool_call_id=tool_call_id,
-                        name=tool_name
-                    )
-                    tool_messages.append(tool_message)
-                    logger.debug(f"Created ToolMessage for {tool_name} id={tool_call_id} len={len(result_text)}")
+                    # Store the full summary by tool_call_id, labeled with tool + args
+                    _label_keys = ('query', 'search_query', 'location', 'city')
+                    query_label = next((tool_args[k] for k in _label_keys if tool_args.get(k)), None)
+                    if not query_label:
+                        # Compact repr of all args (e.g. lat/lon)
+                        query_label = ", ".join(f"{k}={v}" for k, v in tool_args.items()) or None
+                    label = f"[{tool_name}: {query_label}]" if query_label else f"[{tool_name}]"
+                    summaries[tool_call_id] = f"{label}\n{summary_text}"
                     
+                    # Return ToolMessage with the pre-generated summary.
+                    # This is smaller than the raw compact_dump and was
+                    # produced by the low-reasoning summarization_llm.
+                    logger.debug(f"Created summary ToolMessage for {tool_name} id={tool_call_id} len={len(summary_text)}")
+                    return ToolMessage(content=summary_text, tool_call_id=tool_call_id, name=tool_name)
+
                 except Exception as e:
                     error_msg = f"Error executing tool '{tool_name}': {str(e)}"
-                    tool_message = ToolMessage(
-                        content=error_msg,
-                        tool_call_id=tool_call_id,
-                        name=tool_name
-                    )
-                    tool_messages.append(tool_message)
                     logger.debug(f"Tool {tool_name} execution failed: {e}")
+                    return ToolMessage(content=error_msg, tool_call_id=tool_call_id, name=tool_name)
+
+            # Launch all tool calls concurrently
+            logger.info(f"🚀 [{time.strftime('%H:%M:%S')}] Launching {n_calls} tool call(s) in parallel for '{occurrence_id}'")
+            tool_messages = list(await asyncio.gather(
+                *(_execute_one(i, tc) for i, tc in enumerate(tool_calls))
+            ))
+            logger.info(f"✅ [{time.strftime('%H:%M:%S')}] All {n_calls} tool call(s) completed for '{occurrence_id}'")
             
             # Store completed AI+Tool pair in worker's own tool_history (NOT shared messages)
             if tool_messages:
@@ -490,6 +567,11 @@ If you have enough information to answer directly, provide your response without
                 slot["tool_history"] = history
                 slot.pop("pending_ai_message", None)
                 logger.debug(f"Stored AI+Tool pair in worker slot tool_history ({len(history)} total)")
+            
+            # Merge per-result summaries into the slot for assembly at finalize time
+            existing = slot.get("_summaries", {})
+            existing.update(summaries)
+            slot["_summaries"] = existing
             
             logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' tool_node END ({time.time() - _t0:.1f}s)")
             # Return partial update
@@ -588,7 +670,7 @@ If you have enough information to answer directly, provide your response without
     def _push_tool_message(self, slot: Dict[str, Any], tool_name: str, result: Any):
         """Add tool result to conversation history."""
         messages = slot.get("messages", [])
-        text = json.dumps(result, ensure_ascii=False)[:2000]
+        text = json.dumps(result, ensure_ascii=False)
         messages.append(SystemMessage(content=f"[TOOL {tool_name}] {text}"))
         slot["messages"] = messages[-6:]  # Keep last 6 messages
     
@@ -644,9 +726,32 @@ If you have enough information to answer directly, provide your response without
             logger.debug(f"Created tool decision: {decision}")
             return decision
         
-        # No tool calls - this is a final answer
-        content = response.content if hasattr(response, 'content') else str(response)
-        logger.debug(f"No tool calls found, creating final decision with content: {content[:100]}...")
+        # No tool calls - this is a final answer.
+        # Try to parse the LLM's content as JSON with include_summaries
+        # refs, and assemble from stored per-result summaries.
+        raw = response.content if hasattr(response, 'content') else str(response)
+        stored = slot.get("_summaries", {})
+        content = raw  # fallback
+        if stored:
+            try:
+                parsed = json.loads(raw.strip().strip('`').removeprefix('json').strip())
+                refs = parsed.get("include_summaries", [])
+                if refs:
+                    picked = [stored[r] for r in refs if r in stored]
+                    if picked:
+                        content = "\n\n".join(picked)
+                        logger.debug(f"Assembled final answer from {len(picked)}/{len(refs)} referenced summaries")
+                    else:
+                        content = "\n\n".join(stored.values())
+                        logger.debug(f"No matching refs; using all {len(stored)} stored summaries")
+                else:
+                    content = "\n\n".join(stored.values())
+                    logger.debug(f"No include_summaries in JSON; using all {len(stored)} stored summaries")
+            except (json.JSONDecodeError, ValueError):
+                # LLM didn't return valid JSON — fall back to all stored summaries
+                content = "\n\n".join(stored.values())
+                logger.debug(f"Could not parse JSON refs; using all {len(stored)} stored summaries")
+        logger.debug(f"Creating final decision with content len={len(content)}")
         
         decision = {
             "type": "final",

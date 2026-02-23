@@ -83,7 +83,7 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
     async def handle_tool_request(self, tool_name: str, tool_parameters: ToolParameters) -> ToolResponse:
         url, payload, headers = self._build_request(tool_name, tool_parameters)
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, json=payload, headers=headers)
 
         self.logger.info(f"Tool request to {url} - Status Code: {response.status_code}")

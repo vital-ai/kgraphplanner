@@ -132,7 +132,7 @@ class KGraphToolAgent(KGraphBaseAgent):
             "tool_worker_name": self.tool_worker.name,
             "available_tools": self.tool_names,
             "tool_count": len(self.tool_names),
-            "system_directive": self.tool_worker.system_directive[:100] + "..." if len(self.tool_worker.system_directive) > 100 else self.tool_worker.system_directive
+            "system_directive": self.tool_worker.system_directive
         })
         return base_info
 

@@ -76,6 +76,6 @@ class KGraphChatAgent(KGraphBaseAgent):
         base_info.update({
             "agent_type": "chat",
             "chat_worker_name": self.chat_worker.name,
-            "system_directive": self.chat_worker.system_directive[:100] + "..." if len(self.chat_worker.system_directive) > 100 else self.chat_worker.system_directive
+            "system_directive": self.chat_worker.system_directive
         })
         return base_info
