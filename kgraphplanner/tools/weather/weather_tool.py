@@ -99,10 +99,22 @@ class WeatherTool(AbstractTool):
                 # Execute the weather request (async)
                 tool_response = await client.handle_tool_request(ToolNameEnum.weather_tool.value, weather_input)
                 
-                # Extract results - should be WeatherOutput
-                weather_results: WeatherOutput = tool_response.tool_output
+                if not tool_response.success or tool_response.tool_output is None:
+                    logger.warning(f"Weather tool failed: {tool_response.error_message}")
+                    from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import WeatherData
+                    error_weather_data = WeatherData(
+                        latitude=latitude,
+                        longitude=longitude,
+                        timezone="Unknown",
+                        current={},
+                        daily={}
+                    )
+                    return WeatherOutput(
+                        tool="weather_tool",
+                        weather_data=error_weather_data
+                    )
                 
-                return weather_results
+                return tool_response.tool_output
                 
             except Exception as e:
                 logger.warning(f"Weather tool error: {e}")

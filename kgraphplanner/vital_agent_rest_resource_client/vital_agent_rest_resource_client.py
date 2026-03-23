@@ -87,6 +87,17 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
             response = await client.post(url, json=payload, headers=headers)
 
         self.logger.info(f"Tool request to {url} - Status Code: {response.status_code}")
+
+        if response.status_code in (401, 403):
+            msg = f"Tool server auth error ({response.status_code}) for {tool_name}: {response.text}"
+            self.logger.error(msg)
+            raise PermissionError(msg)
+
+        if response.status_code >= 400:
+            msg = f"Tool server error ({response.status_code}) for {tool_name}: {response.text}"
+            self.logger.error(msg)
+            return ToolResponse.create_error(error_message=msg, duration_ms=0)
+
         response_json = response.json()
         self.logger.debug(f"Response JSON: {response_json}")
 

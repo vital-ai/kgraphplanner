@@ -54,8 +54,8 @@ class AddressValidationTool(AbstractTool):
             # Get tool endpoint from config
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
-                # Return error in AddressValidationOutput format for consistency
                 return AddressValidationOutput(
+                    tool="google_address_validation_tool",
                     results=[]
                 )
             
@@ -76,17 +76,21 @@ class AddressValidationTool(AbstractTool):
                 # Execute the validation (async)
                 tool_response = await client.handle_tool_request(ToolNameEnum.google_address_validation_tool.value, address_validation_input)
                 
-                # Extract results - should be AddressValidationOutput
-                address_validation_results: AddressValidationOutput = tool_response.tool_output
+                if not tool_response.success or tool_response.tool_output is None:
+                    logger.warning(f"Address validation tool failed: {tool_response.error_message}")
+                    return AddressValidationOutput(
+                        tool="google_address_validation_tool",
+                        results=[]
+                    )
                 
-                return address_validation_results
+                return tool_response.tool_output
                 
             except Exception as e:
                 logger.warning(f"Address validation tool error: {e}")
-                error_output = AddressValidationOutput(
+                return AddressValidationOutput(
+                    tool="google_address_validation_tool",
                     results=[]
                 )
-                return error_output
         
         return google_address_validation_tool
     

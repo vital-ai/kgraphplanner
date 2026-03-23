@@ -54,8 +54,8 @@ class PlaceSearchTool(AbstractTool):
             # Get tool endpoint from config
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
-                # Return error in PlaceSearchOutput format for consistency
                 return PlaceSearchOutput(
+                    tool="place_search_tool",
                     results=[]
                 )
             
@@ -76,17 +76,21 @@ class PlaceSearchTool(AbstractTool):
                 # Execute the search (async)
                 tool_response = await client.handle_tool_request(ToolNameEnum.place_search_tool.value, place_search_input)
                 
-                # Extract results - should be PlaceSearchOutput
-                place_search_results: PlaceSearchOutput = tool_response.tool_output
+                if not tool_response.success or tool_response.tool_output is None:
+                    logger.warning(f"Place search tool failed: {tool_response.error_message}")
+                    return PlaceSearchOutput(
+                        tool="place_search_tool",
+                        results=[]
+                    )
                 
-                return place_search_results
+                return tool_response.tool_output
                 
             except Exception as e:
                 logger.warning(f"Place search tool error: {e}")
-                error_output = PlaceSearchOutput(
+                return PlaceSearchOutput(
+                    tool="place_search_tool",
                     results=[]
                 )
-                return error_output
         
         return place_search_tool
     

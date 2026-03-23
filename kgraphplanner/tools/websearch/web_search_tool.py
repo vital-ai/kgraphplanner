@@ -101,7 +101,7 @@ class WebSearchTool(AbstractTool):
                 # Execute the search (async)
                 tool_response = await client.handle_tool_request(ToolNameEnum.google_web_search_tool.value, web_search_input)
                 
-                if tool_response is None or tool_response.tool_output is None:
+                if tool_response is None or not tool_response.success or tool_response.tool_output is None:
                     logger.warning(f"Web search tool returned None response for query: {search_query}")
                     return f"No web search results available for query: {search_query}"
                 
