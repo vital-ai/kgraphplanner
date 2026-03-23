@@ -27,12 +27,16 @@ class WebSearchToolHandler(ToolHandler):
             knowledge_graph_data = tool_output.get('knowledge_graph')
             related_questions_data = tool_output.get('related_questions', [])
             search_information = tool_output.get('search_information')
+            api_error = tool_output.get('api_error')
+            api_status_code = tool_output.get('api_status_code')
         else:
             search_results = response_json.get('results', [])
             total_results = response_json.get('total_results', 0)
             knowledge_graph_data = response_json.get('knowledge_graph')
             related_questions_data = response_json.get('related_questions', [])
             search_information = response_json.get('search_information')
+            api_error = response_json.get('api_error')
+            api_status_code = response_json.get('api_status_code')
         
         # Parse search results
         web_search_results = []
@@ -53,6 +57,8 @@ class WebSearchToolHandler(ToolHandler):
                 reviews=result.get('reviews'),
                 address=result.get('address'),
                 phone=result.get('phone'),
+                place_id=result.get('place_id'),
+                hours=result.get('hours'),
                 # Recipe result fields
                 ingredients=result.get('ingredients'),
                 total_time=result.get('total_time')
@@ -94,7 +100,9 @@ class WebSearchToolHandler(ToolHandler):
             total_results=total_results if total_results > 0 else len(web_search_results),
             knowledge_graph=knowledge_graph,
             related_questions=related_questions if related_questions else None,
-            search_information=search_information
+            search_information=search_information,
+            api_error=api_error,
+            api_status_code=api_status_code
         )
     
     def handle_response(self, tool_parameters: ToolParameters, response_json: dict) -> WebSearchOutput:

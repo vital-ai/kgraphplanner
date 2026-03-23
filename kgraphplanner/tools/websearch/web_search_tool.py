@@ -42,7 +42,8 @@ class WebSearchTool(AbstractTool):
         async def google_web_search_tool(search_query: str, num_results: int = 5, location: str = None, 
                                  language: str = None, country: str = None, device: str = "desktop",
                                  safe_search: str = None, search_type: str = "search", 
-                                 time_period: str = None) -> WebSearchOutput:
+                                 time_period: str = None, ludocid: str = None,
+                                 kgmid: str = None) -> WebSearchOutput:
             """
             Search the web using Google and return relevant results.
             
@@ -54,8 +55,10 @@ class WebSearchTool(AbstractTool):
                 country: Country for search results
                 device: Device type (desktop/mobile)
                 safe_search: Safe search setting
-                search_type: Type of search (search/images/news)
+                search_type: Type of search (search/images/news/shopping/local)
                 time_period: Time period filter
+                ludocid: Google CID (customer identifier) of a place for deep-diving a specific Google Maps listing
+                kgmid: Google Knowledge Graph ID (KGMID) for querying a specific Knowledge Graph entity
                 
             Returns:
                 WebSearchOutput: Search results with titles, URLs, and snippets
@@ -71,7 +74,9 @@ class WebSearchTool(AbstractTool):
                 device=device,
                 safe_search=safe_search,
                 search_type=search_type,
-                time_period=time_period
+                time_period=time_period,
+                ludocid=ludocid,
+                kgmid=kgmid
             )
             
             # Get tool endpoint from config

@@ -12,3 +12,6 @@ test_output/
 test_scripts_internal
 planning_internal
 
+
+.DS_Store
+logs

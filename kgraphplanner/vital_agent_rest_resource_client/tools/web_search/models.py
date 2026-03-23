@@ -19,6 +19,8 @@ class WebSearchResult(BaseModel):
     reviews: Optional[int] = Field(None, description="Number of reviews")
     address: Optional[str] = Field(None, description="Address for local results")
     phone: Optional[str] = Field(None, description="Phone number for local results")
+    place_id: Optional[str] = Field(None, description="Google CID (ludocid) for local results, can be used for deep-dive queries")
+    hours: Optional[str] = Field(None, description="Business hours for local results")
     ingredients: Optional[List[str]] = Field(None, description="Ingredients for recipe results")
     total_time: Optional[str] = Field(None, description="Total time for recipe results")
 
@@ -47,8 +49,10 @@ class WebSearchInput(BaseModel):
     country: Optional[str] = Field(None, description="Google country code (e.g., 'us')")
     device: Optional[Literal["desktop", "mobile", "tablet"]] = Field("desktop", description="Device type for search")
     safe_search: Optional[Literal["active", "off"]] = Field(None, description="Safe search setting")
-    search_type: Optional[Literal["search", "news", "images", "shopping"]] = Field("search", description="Type of search to perform")
+    search_type: Optional[Literal["search", "news", "images", "shopping", "local"]] = Field("search", description="Type of search to perform")
     time_period: Optional[Literal["hour", "day", "week", "month", "year"]] = Field(None, description="Time period filter for results")
+    ludocid: Optional[str] = Field(None, description="Google CID (customer identifier) of a place for deep-diving a specific Google Maps listing")
+    kgmid: Optional[str] = Field(None, description="Google Knowledge Graph ID (KGMID) for querying a specific Knowledge Graph entity")
 
     model_config = {
         "json_schema_extra": {
@@ -72,6 +76,8 @@ class WebSearchOutput(BaseModel):
     knowledge_graph: Optional[KnowledgeGraph] = Field(None, description="Knowledge graph information")
     related_questions: Optional[List[RelatedQuestion]] = Field(None, description="Related questions")
     search_information: Optional[dict] = Field(None, description="Search metadata and information")
+    api_error: Optional[str] = Field(None, description="API error message if request failed")
+    api_status_code: Optional[int] = Field(None, description="API response status code")
 
     def compact_dump(self) -> dict:
         """Return a compact dict with all None/null fields stripped."""
