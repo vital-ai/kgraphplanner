@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kgraphplanner"
-version = "0.0.26"
+version = "0.0.27"
 description = "KGraph Planner"
 readme = "README.md"
 license = {text = "Apache License 2.0"}
