@@ -190,7 +190,7 @@ async def run() -> TestResult:
             response_messages = result.get("messages", [])
             if response_messages:
                 content = response_messages[-1].content
-                log(buf, f"  Response: {content[:300]}")
+                log(buf, f"  Response: {content}")
                 sub_results.append({"test": i, "desc": desc, "expected": expected, "ok": True})
             else:
                 log(buf, "  Response: [No response generated]")

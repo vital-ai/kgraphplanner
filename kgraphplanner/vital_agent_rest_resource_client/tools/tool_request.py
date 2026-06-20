@@ -4,6 +4,7 @@ from .tool_name_enum import ToolName
 from .google_address_validation.models import AddressValidationInput
 from .place_search.models import PlaceSearchInput
 from .weather.models import WeatherInput
+from .serper_web_search.models import SerperWebSearchInput
 from .web_search.models import WebSearchInput
 
 
@@ -15,6 +16,7 @@ class ToolRequest(BaseModel):
     tool_input: Union[
         AddressValidationInput, 
         PlaceSearchInput, 
+        SerperWebSearchInput,
         WeatherInput,
         WebSearchInput
         ] = Field(..., description="Tool-specific input parameters")

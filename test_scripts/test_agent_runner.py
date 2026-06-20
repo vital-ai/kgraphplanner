@@ -35,6 +35,7 @@ CASES = [
     ("ta_place",     "test_scripts.cases.case_tool_agent_place_search",   "Tool Agent: Place Search"),
     ("ta_multi",     "test_scripts.cases.case_tool_agent_multi",          "Tool Agent: Multi-Tool"),
     ("chat",         "test_scripts.cases.case_chat_agent",               "Chat Agent"),
+    ("tool_direct_local", "test_scripts.cases.case_tool_direct_local",  "Direct Tool Tests (Local Models)"),
 ]
 
 

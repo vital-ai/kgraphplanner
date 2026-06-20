@@ -96,7 +96,7 @@ async def run() -> TestResult:
         if response_messages:
             content = response_messages[-1].content
             log(buf, f"\n  Response (len={len(content)}):")
-            log(buf, f"  {content[:500]}")
+            log(buf, f"  {content}")
 
             # Basic check: should mention at least 2 of the 3 cities
             content_lower = content.lower()

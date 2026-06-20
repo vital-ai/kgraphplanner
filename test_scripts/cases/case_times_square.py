@@ -42,7 +42,7 @@ def _run_tool_call_test(
 
     response = llm_with_tools.invoke(messages)
     log(buf, f"  Response type: {type(response).__name__}")
-    log(buf, f"  Content: {response.content[:200] if response.content else '(empty)'}")
+    log(buf, f"  Content: {response.content if response.content else '(empty)'}")
 
     tool_calls = getattr(response, 'tool_calls', None) or []
     log(buf, f"  Tool calls: {len(tool_calls)}")

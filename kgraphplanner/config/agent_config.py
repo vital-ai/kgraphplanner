@@ -111,6 +111,7 @@ class WeaviateConfig:
     grpc_secure: bool = False
     skip_init_checks: bool = False
     auth_mode: str = "none"          # "bearer", "api_key", or "none"
+    collection_prefix: str = ""   # environment prefix for collection names (e.g. "Dev", "Prod")
     default_collection: str = "KnowledgeBase"
     embedding_provider: str = "openai"           # "openai", "huggingface", "cohere", etc.
     embedding_model: str = "text-embedding-3-small"
@@ -221,6 +222,7 @@ class AgentConfig:
             grpc_secure=wv_data.get("grpc_secure", WeaviateConfig.grpc_secure),
             skip_init_checks=wv_data.get("skip_init_checks", WeaviateConfig.skip_init_checks),
             auth_mode=wv_data.get("auth_mode", WeaviateConfig.auth_mode),
+            collection_prefix=wv_data.get("collection_prefix", WeaviateConfig.collection_prefix),
             default_collection=wv_data.get("default_collection", WeaviateConfig.default_collection),
             embedding_model=wv_data.get("embedding_model", WeaviateConfig.embedding_model),
             search_type=wv_data.get("search_type", WeaviateConfig.search_type),

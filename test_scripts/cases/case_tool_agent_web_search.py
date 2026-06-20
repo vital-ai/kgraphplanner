@@ -68,7 +68,7 @@ async def run() -> TestResult:
 
     content = result["messages"][-1].content
     log(buf, f"  Response (len={len(content)}):")
-    log(buf, f"  {content[:300]}")
+    log(buf, f"  {content}")
 
     write_log(buf, "tool_agent_web_search_run.log")
 

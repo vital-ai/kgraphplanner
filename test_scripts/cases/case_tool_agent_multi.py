@@ -82,7 +82,7 @@ async def run() -> TestResult:
 
     content = result["messages"][-1].content
     log(buf, f"  Response (len={len(content)}):")
-    log(buf, f"  {content[:500]}")
+    log(buf, f"  {content}")
 
     agent_info = agent.get_agent_info()
     log(buf, f"\n  Agent info: {agent_info}")
@@ -94,5 +94,5 @@ async def run() -> TestResult:
     return TestResult(
         name="Tool Agent: Multi-Tool",
         passed=True,
-        details={"query": query[:60] + "...", "response_len": len(content)},
+        details={"query": query, "response_len": len(content)},
     )

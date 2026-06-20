@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from .google_address_validation.models import AddressValidationOutput
 from .place_search.models import PlaceSearchOutput
 from .weather.models import WeatherOutput
+from .serper_web_search.models import SerperWebSearchOutput
 from .web_search.models import WebSearchOutput
 
 
@@ -14,6 +15,7 @@ class ToolResponse(BaseModel):
     tool_output: Optional[Union[
         AddressValidationOutput, 
         PlaceSearchOutput, 
+        SerperWebSearchOutput,
         WeatherOutput,
         WebSearchOutput
         ]] = Field(None, description="Tool-specific output data")

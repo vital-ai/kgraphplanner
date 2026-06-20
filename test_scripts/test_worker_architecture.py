@@ -225,8 +225,7 @@ async def run_test():
         if final_state.get("messages"):
             print("💬 Messages from all workers:")
             for i, msg in enumerate(final_state["messages"]):
-                content_preview = msg.content[:150] + "..." if len(msg.content) > 150 else msg.content
-                print(f"  {i+1}. {type(msg).__name__}: {content_preview}")
+                print(f"  {i+1}. {type(msg).__name__}: {msg.content}")
         
         # Display decisions from each worker
         if final_state.get("agent_data") and "decisions" in final_state["agent_data"]:
@@ -234,8 +233,7 @@ async def run_test():
             decisions = final_state["agent_data"]["decisions"]
             for worker_id, decision in decisions.items():
                 if isinstance(decision, dict) and "answer" in decision:
-                    answer_preview = decision["answer"][:100] + "..." if len(decision["answer"]) > 100 else decision["answer"]
-                    print(f"  {worker_id}: {answer_preview}")
+                    print(f"  {worker_id}: {decision['answer']}")
         
         print("\n✅ Multi-worker architecture test completed successfully!")
         print("\n🎯 This demonstrates multiple worker instances:")

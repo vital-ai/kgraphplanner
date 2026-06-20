@@ -37,7 +37,7 @@ def _test_address_validation(buf: io.StringIO, tm=None) -> bool:
     tool = tm.get_tool("google_address_validation_tool") if tm else AddressValidationTool({"tool_endpoint": "http://localhost:8008"})
 
     log(buf, f"  name: {tool.get_tool_name()}")
-    log(buf, f"  description: {tool.get_tool_description()[:80]}")
+    log(buf, f"  description: {tool.get_tool_description()}")
 
     schema = tool.get_tool_schema()
     assert schema is not None, "Schema is None"
@@ -68,7 +68,7 @@ def _test_place_search(buf: io.StringIO, tm=None) -> bool:
     tool = tm.get_tool("place_search_tool") if tm else PlaceSearchTool({"tool_endpoint": "http://localhost:8008"})
 
     log(buf, f"  name: {tool.get_tool_name()}")
-    log(buf, f"  description: {tool.get_tool_description()[:80]}")
+    log(buf, f"  description: {tool.get_tool_description()}")
 
     schema = tool.get_tool_schema()
     assert schema is not None, "Schema is None"
@@ -97,7 +97,7 @@ def _test_weather(buf: io.StringIO, tm=None) -> bool:
     tool = tm.get_tool("weather_tool") if tm else WeatherTool({"tool_endpoint": "http://localhost:8008"})
 
     log(buf, f"  name: {tool.get_tool_name()}")
-    log(buf, f"  description: {tool.get_tool_description()[:80]}")
+    log(buf, f"  description: {tool.get_tool_description()}")
 
     schema = tool.get_tool_schema()
     assert schema is not None, "Schema is None"
@@ -144,7 +144,7 @@ def _test_websearch(buf: io.StringIO, tm=None) -> bool:
     tool = tm.get_tool("google_web_search_tool") if tm else WebSearchTool({"tool_endpoint": "http://localhost:8008"})
 
     log(buf, f"  name: {tool.get_tool_name()}")
-    log(buf, f"  description: {tool.get_tool_description()[:80]}")
+    log(buf, f"  description: {tool.get_tool_description()}")
 
     schema = tool.get_tool_schema()
     assert schema is not None, "Schema is None"

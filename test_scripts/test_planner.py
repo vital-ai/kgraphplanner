@@ -450,8 +450,8 @@ class Worker:
         def _push_tool_msg(slot: Dict[str, Any], tool_name: str, payload: Any):
             msgs: List[BaseMessage] = slot.get("messages", [])
             # switch when using real tools
-            # msgs.append(ToolMessage(content=json.dumps(payload)[:2000], name=tool_name))
-            text = json.dumps(payload, ensure_ascii=False)[:2000]
+            # msgs.append(ToolMessage(content=json.dumps(payload), name=tool_name))
+            text = json.dumps(payload, ensure_ascii=False)
             msgs.append(SystemMessage(content=f"[TOOL {tool_name}] {text}"))
             slot["messages"] = msgs[-6:]
 

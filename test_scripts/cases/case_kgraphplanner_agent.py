@@ -231,13 +231,13 @@ async def run() -> TestResult:
             [HumanMessage(content="My name is Alice and I like hiking")], config=config
         )
         r1_content = result1['messages'][-1].content
-        log(buf, f"  Response 1: {r1_content[:200]}")
+        log(buf, f"  Response 1: {r1_content}")
 
         result2 = await agent.arun(
             [HumanMessage(content="What's my name and what do I like?")], config=config
         )
         r2_content = result2['messages'][-1].content
-        log(buf, f"  Response 2: {r2_content[:200]}")
+        log(buf, f"  Response 2: {r2_content}")
 
         # Basic check: response 2 should mention "Alice" or "hiking"
         r2_lower = r2_content.lower()

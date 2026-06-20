@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Tool Test Runner.
+General Agent Test Runner.
 
-Runs tool-related test cases from the cases/ package.
+Dedicated runner for the general conversational agent test case
+(chat worker ↔ tool worker loop with web search, weather, place search).
 
 Usage:
-    python test_tool_runner.py              # run all cases
-    python test_tool_runner.py 1            # run case 1 only
-    python test_tool_runner.py direct       # substring match on case name
-    python test_tool_runner.py --list       # list available cases
+    python -m test_scripts.test_general_agent_runner
+    python -m test_scripts.test_general_agent_runner --list
 """
 
 import os
@@ -19,20 +18,42 @@ sys.path.insert(0, project_root)
 
 import argparse
 import asyncio
+import datetime as _dt
 import importlib
 import logging
 
 from test_scripts.cases.test_result import TestResult, run_case
 
-logging.basicConfig(level=logging.INFO, format="%(name)s - %(levelname)s - %(message)s")
+# ---------------------------------------------------------------------------
+# Logging — timestamped file + stderr, flush-on-write for crash safety
+# ---------------------------------------------------------------------------
 
-# Registry: (short_key, module_path, display_name)
+_log_dir = os.path.join(project_root, "test_output")
+os.makedirs(_log_dir, exist_ok=True)
+_log_ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+_log_file = os.path.join(_log_dir, f"general_agent_runner_{_log_ts}.log")
+
+_file_handler = logging.FileHandler(_log_file, mode="w")
+_file_handler.setFormatter(logging.Formatter("%(asctime)s %(name)s - %(levelname)s - %(message)s"))
+_file_handler.stream.reconfigure(write_through=True)
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        _file_handler,
+    ],
+)
+for _name in ("httpx", "httpcore", "openai", "anthropic", "urllib3"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
+
+# ---------------------------------------------------------------------------
+# Case registry: (short_key, module_path, display_name)
+# ---------------------------------------------------------------------------
+
 CASES = [
-    ("direct",    "test_scripts.cases.case_tool_direct",          "Direct Tool Tests"),
-    ("manager",   "test_scripts.cases.case_tool_manager",         "Tool Manager"),
-    ("weather",   "test_scripts.cases.case_multi_weather",        "Multi-Weather Agent"),
-    ("times_sq",  "test_scripts.cases.case_times_square",          "Times Square"),
-    ("serper",    "test_scripts.cases.case_serper_web_search",    "Serper Web Search"),
+    ("general", "test_scripts.cases.case_general_agent", "General Agent (chat ↔ tool)"),
 ]
 
 
@@ -65,16 +86,22 @@ def resolve_selection(selectors: list[str]) -> list[tuple[str, str, str]]:
     return deduped
 
 
-async def run_cases(cases: list[tuple[str, str, str]]) -> list[TestResult]:
+async def run_cases(cases: list[tuple[str, str, str]], request_filter: list[int] | None = None) -> list[TestResult]:
     results: list[TestResult] = []
 
     for idx, (key, module_path, display_name) in enumerate(cases, 1):
         print(f"\n{'=' * 60}")
         print(f"CASE {idx}/{len(cases)}: {display_name}  [{key}]")
+        if request_filter:
+            print(f"  (running request(s): {request_filter})")
         print(f"{'=' * 60}")
 
         mod = importlib.import_module(module_path)
-        result = await run_case(display_name, mod.run)
+        run_fn = mod.run
+        if request_filter:
+            import functools
+            run_fn = functools.partial(mod.run, request_filter=request_filter)
+        result = await run_case(display_name, run_fn)
         results.append(result)
 
         print(f"\n{result.summary_line()}")
@@ -101,11 +128,13 @@ def print_summary(results: list[TestResult]):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Tool Test Runner")
+    parser = argparse.ArgumentParser(description="General Agent Test Runner")
     parser.add_argument("cases", nargs="*",
-                        help="Case selectors: 1-based index or name substring (default: all)")
+                        help="Case selectors (default: all)")
     parser.add_argument("--list", action="store_true",
                         help="List available cases and exit")
+    parser.add_argument("-r", "--request", type=int, nargs="+",
+                        help="Run only specific request number(s) (1-based)")
     args = parser.parse_args()
 
     if args.list:
@@ -119,7 +148,7 @@ def main():
         print("No cases selected. Use --list to see available cases.")
         return
 
-    results = asyncio.run(run_cases(cases))
+    results = asyncio.run(run_cases(cases, request_filter=args.request))
     print_summary(results)
 
 

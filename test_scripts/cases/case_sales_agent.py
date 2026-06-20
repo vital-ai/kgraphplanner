@@ -716,19 +716,19 @@ async def run() -> TestResult:
             tool_result = results_map.get("interactive_tool", {})
             router_result = results_map.get("assistant_router", {})
 
-            topic_id = topic_result.get('selected_case_id') or str(topic_result.get('result_text', '?'))[:80]
-            router_id = router_result.get('selected_case_id') or str(router_result.get('result_text', '?'))[:80]
+            topic_id = topic_result.get('selected_case_id') or str(topic_result.get('result_text', '?'))
+            router_id = router_result.get('selected_case_id') or str(router_result.get('result_text', '?'))
 
             log(rbuf, f"  Topic: {topic_id}")
             if init_lookup_result:
-                log(rbuf, f"  Initial lookup: {str(init_lookup_result.get('result_text', ''))[:120]}")
+                log(rbuf, f"  Initial lookup: {str(init_lookup_result.get('result_text', ''))}")
             if chat_result:
                 chat_action = chat_result.get('action', '?')
                 log(rbuf, f"  Interactive chat: action={chat_action}")
             if tool_result:
-                log(rbuf, f"  Interactive tool: {str(tool_result.get('result_text', ''))[:120]}")
+                log(rbuf, f"  Interactive tool: {str(tool_result.get('result_text', ''))}")
             log(rbuf, f"  Router: {router_id}")
-            log(rbuf, f"  Final response: {final_text[:300]}")
+            log(rbuf, f"  Final response: {final_text}")
 
             _req_elapsed = _time.time() - _req_t0
             log(rbuf, f"  ⏱️  Request {i} took {_req_elapsed:.1f}s")

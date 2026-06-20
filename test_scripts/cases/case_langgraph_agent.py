@@ -69,7 +69,7 @@ async def run() -> TestResult:
     )
     response1 = result["messages"][-1].content
     log(buf, f"  User: Hello, how are you?")
-    log(buf, f"  AI: {response1[:200]}")
+    log(buf, f"  AI: {response1}")
     assert response1, "Expected non-empty response"
 
     # --- Test 2: Conversation continuity ---
@@ -88,7 +88,7 @@ async def run() -> TestResult:
     )
     response2 = result2["messages"][-1].content
     log(buf, f"  Turn 2: What is my favorite color?")
-    log(buf, f"  AI: {response2[:200]}")
+    log(buf, f"  AI: {response2}")
 
     continuity_ok = "blue" in response2.lower()
     log(buf, f"  Continuity check: {'✅' if continuity_ok else '⚠️'} (mentions blue: {continuity_ok})")

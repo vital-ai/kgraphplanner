@@ -173,7 +173,7 @@ async def run() -> TestResult:
         if match:
             correct += 1
         symbol = "✅" if match else "⚠️"
-        log(buf, f"  {symbol} [{i}] '{query[:50]}...' → {selected_id} (expected {expected})")
+        log(buf, f"  {symbol} [{i}] '{query}' → {selected_id} (expected {expected})")
 
     log(buf, f"\n  Predefined: {correct}/{total} matched")
 
@@ -191,10 +191,10 @@ async def run() -> TestResult:
         if case_result and isinstance(case_result, dict):
             sel = case_result.get("selected_case_name", "?")
             sid = case_result.get("selected_case_id", "?")
-            log(buf, f"  [{i}] '{text[:50]}...' → {sel} ({sid})")
+            log(buf, f"  [{i}] '{text}' → {sel} ({sid})")
             custom_results.append(sid)
         else:
-            log(buf, f"  [{i}] '{text[:50]}...' → NO RESULT")
+            log(buf, f"  [{i}] '{text}' → NO RESULT")
             custom_results.append(None)
 
     log(buf, f"\n  Custom: {len([r for r in custom_results if r])}/{len(CUSTOM_TESTS)} returned results")

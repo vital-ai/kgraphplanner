@@ -114,9 +114,15 @@ class ToolManager:
                 elif tool_name == ToolNameEnum.weather_tool.value:
                     from kgraphplanner.tools.weather.weather_tool import WeatherTool
                     weather_tool = WeatherTool(individual_tool_config, self)
+                elif tool_name == ToolNameEnum.serper_web_search_tool.value:
+                    from kgraphplanner.tools.serper_websearch.serper_web_search_tool import SerperWebSearchTool
+                    serper_web_search_tool = SerperWebSearchTool(individual_tool_config, self)
                 elif tool_name == "knowledge_search_tool":
                     from kgraphplanner.tools.knowledge.knowledge_search_tool import KnowledgeSearchTool
                     knowledge_tool = KnowledgeSearchTool(individual_tool_config, self)
+                elif tool_name == "knowledge_get_document_tool":
+                    from kgraphplanner.tools.knowledge.knowledge_get_document_tool import KnowledgeGetDocumentTool
+                    knowledge_get_doc_tool = KnowledgeGetDocumentTool(individual_tool_config, self)
             except ImportError as e:
                 logger.warning(f"Could not load tool '{tool_name}': {e}")
     

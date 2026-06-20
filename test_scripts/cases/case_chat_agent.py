@@ -83,7 +83,7 @@ async def run() -> TestResult:
         result = await agent.arun([HumanMessage(content=msg)], config=config)
         content = result.get("messages", [])[-1].content if result.get("messages") else ""
         responses.append(content)
-        log(buf, f"  AI: {content[:200]}")
+        log(buf, f"  AI: {content}")
 
         if i == 1:
             info = agent.get_agent_info()
@@ -109,7 +109,7 @@ async def run() -> TestResult:
 
     result1 = await agent1.arun([HumanMessage(content="My favorite color is blue and I love hiking.")], config=cfg)
     r1 = result1.get("messages", [])[-1].content if result1.get("messages") else ""
-    log(buf, f"  Agent 1 → '{r1[:150]}'")
+    log(buf, f"  Agent 1 → '{r1}'")
 
     # New agent instance, same checkpointer
     worker2 = KGraphChatWorker(
@@ -121,7 +121,7 @@ async def run() -> TestResult:
 
     result2 = await agent2.arun([HumanMessage(content="What's my favorite color and hobby?")], config=cfg)
     r2 = result2.get("messages", [])[-1].content if result2.get("messages") else ""
-    log(buf, f"  Agent 2 → '{r2[:150]}'")
+    log(buf, f"  Agent 2 → '{r2}'")
 
     memory_ok = "blue" in r2.lower() and "hik" in r2.lower()
     log(buf, f"  Memory persistence: {'✅' if memory_ok else '⚠️'} (mentions blue+hiking: {memory_ok})")

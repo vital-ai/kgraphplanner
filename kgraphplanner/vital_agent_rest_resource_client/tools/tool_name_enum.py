@@ -10,4 +10,5 @@ class ToolName(str, Enum):
     google_address_validation_tool = "google_address_validation_tool"
     google_web_search_tool = "google_web_search_tool"
     place_search_tool = "place_search_tool"
+    serper_web_search_tool = "serper_web_search_tool"
     weather_tool = "weather_tool"

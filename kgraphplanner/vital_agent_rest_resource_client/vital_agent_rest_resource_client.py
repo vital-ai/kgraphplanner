@@ -12,6 +12,7 @@ from kgraphplanner.vital_agent_rest_resource_client.tools.tool_response import T
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_results import ToolResults
 from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import WeatherOutput, WeatherData
 from kgraphplanner.vital_agent_rest_resource_client.tools.weather.tool_handler import WeatherToolHandler
+from kgraphplanner.vital_agent_rest_resource_client.tools.serper_web_search.tool_handler import SerperWebSearchToolHandler
 from kgraphplanner.vital_agent_rest_resource_client.tools.web_search.tool_handler import WebSearchToolHandler
 
 
@@ -68,6 +69,13 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
 
         if tool_name == "google_web_search_tool":
             handler = WebSearchToolHandler()
+            return ToolResponse.create_success(
+                tool_output=handler.handle_response(tool_parameters, response_json),
+                duration_ms=0,
+            )
+
+        if tool_name == "serper_web_search_tool":
+            handler = SerperWebSearchToolHandler()
             return ToolResponse.create_success(
                 tool_output=handler.handle_response(tool_parameters, response_json),
                 duration_ms=0,

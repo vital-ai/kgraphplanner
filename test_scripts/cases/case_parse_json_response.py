@@ -210,7 +210,7 @@ async def run() -> TestResult:
         reason = classifier_result.get("reason", "<missing>")
         result_text = classifier_result.get("result_text", "")
 
-        log(buf, f"  Classifier result_text: {result_text[:200]}")
+        log(buf, f"  Classifier result_text: {result_text}")
         log(buf, f"  Parsed action: {action}")
         log(buf, f"  Parsed reason: {reason}")
 
