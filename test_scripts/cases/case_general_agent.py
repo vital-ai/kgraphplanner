@@ -26,7 +26,7 @@ from kgraphplanner.checkpointer.kgraphmemory_checkpointer import KGraphMemoryChe
 
 from test_scripts.cases.test_result import TestResult
 from test_scripts.cases.case_helpers import (
-    create_tool_manager, check_tools_available,
+    create_tool_manager, check_tools_available, refresh_jwt_token,
     log, write_log, save_png, execute_with_logging, OUTPUT_DIR,
 )
 
@@ -127,6 +127,9 @@ async def run(request_filter: list[int] | None = None) -> TestResult:
         log(buf, f"  Input: {user_input}")
 
         try:
+            # Refresh JWT before each request (60s TTL)
+            refresh_jwt_token(tm)
+
             _req_t0 = _time.time()
             config = {"configurable": {"thread_id": f"general-agent-test-{i}"}}
             messages = [HumanMessage(content=user_input)]

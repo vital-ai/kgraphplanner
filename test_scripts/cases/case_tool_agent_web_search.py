@@ -63,7 +63,7 @@ async def run() -> TestResult:
     log(buf, f"\n  === Execute ===")
     log(buf, f"  Query: {query}")
 
-    config = {"configurable": {"thread_id": "ta-web-search"}, "recursion_limit": 10}
+    config = {"configurable": {"thread_id": "ta-web-search"}, "recursion_limit": 25}
     result = await agent.arun(messages=[HumanMessage(content=f"Please search for: {query}")], config=config)
 
     content = result["messages"][-1].content

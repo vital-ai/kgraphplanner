@@ -73,7 +73,33 @@ def create_tool_manager() -> ToolManager:
         tm.set_jwt_token(token)
         print(f"  JWT token set")
 
+    # Register a factory for auto-refresh (60s TTL)
+    def _token_factory():
+        t, e = get_keycloak_token()
+        if e:
+            print(f"  JWT auto-refresh failed: {e}")
+            return None
+        return t
+    tm.set_jwt_token_factory(_token_factory)
+
     return tm
+
+
+def refresh_jwt_token(tool_manager: ToolManager) -> bool:
+    """Re-fetch a Keycloak JWT and set it on the ToolManager.
+
+    The token TTL is only 60s, so this should be called before each
+    test request to avoid mid-request expiration.
+
+    Returns:
+        True if the token was refreshed successfully.
+    """
+    token, err = get_keycloak_token()
+    if err:
+        print(f"  JWT refresh failed: {err}")
+        return False
+    tool_manager.set_jwt_token(token)
+    return True
 
 
 def check_tools_available(tool_manager: ToolManager) -> bool:

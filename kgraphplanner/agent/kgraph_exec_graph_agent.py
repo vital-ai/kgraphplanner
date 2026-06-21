@@ -491,13 +491,14 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             "work": {}
         }
         
-        # Raise the recursion limit from the default 25 to support
-        # multi-step planning loops (each orchestrator ↔ tool_executor
-        # round trip traverses ~10+ graph nodes).
+        # Raise the recursion limit to support multi-step planning
+        # loops (each orchestrator ↔ tool_executor round trip traverses
+        # ~10+ graph nodes; LangGraph 1.2 counts subgraph nodes more
+        # granularly so 200 is needed for complex interactive loops).
         if config and "recursion_limit" not in config:
-            config["recursion_limit"] = 100
+            config["recursion_limit"] = 200
         elif not config:
-            config = {"recursion_limit": 100}
+            config = {"recursion_limit": 200}
 
         result = await compiled_graph.ainvoke(initial_state, config=config)
         return result

@@ -210,7 +210,7 @@ class KGraphMemoryCheckpointer(BaseCheckpointSaver[str], AbstractContextManager,
         
         return config
     
-    def put_writes(self, config: Dict[str, Any], writes: List[Tuple[str, Any]], task_id: str) -> None:
+    def put_writes(self, config: Dict[str, Any], writes: List[Tuple[str, Any]], task_id: str, task_path: str = "") -> None:
         """Store intermediate writes linked to a checkpoint.
         
         LangGraph expects pending_writes as 3-tuples (task_id, channel, value).
@@ -247,7 +247,7 @@ class KGraphMemoryCheckpointer(BaseCheckpointSaver[str], AbstractContextManager,
         """Asynchronous version of put."""
         return await asyncio.to_thread(self.put, config, checkpoint, metadata, new_versions)
     
-    async def aput_writes(self, config: Dict[str, Any], writes: List[Tuple[str, Any]], task_id: str) -> None:
+    async def aput_writes(self, config: Dict[str, Any], writes: List[Tuple[str, Any]], task_id: str, task_path: str = "") -> None:
         """Asynchronous version of put_writes."""
         return await asyncio.to_thread(self.put_writes, config, writes, task_id)
     

@@ -298,6 +298,7 @@ def _build_workers(llm: BaseChatModel):
         ),
         tool_manager=tm,
         available_tool_ids=[LOAN_TOOL_NAME],
+        summarize_results=False,
     )
 
     assistant_router = KGraphCaseWorker(

@@ -66,6 +66,7 @@ async def run() -> TestResult:
         required_inputs=["request"],
         tool_manager=tm,
         available_tool_ids=[ToolNameEnum.weather_tool.value],
+        summarize_results=False,
     )
 
     agent = KGraphToolAgent(

@@ -468,6 +468,35 @@ class KGraphChatWorker(KGraphWorker):
             )
             return result
         
+        # --- Case 4: Non-empty string that wasn't parsed as JSON ---
+        # The tool worker returned a result but it's not structured JSON.
+        # Treat any non-empty result as a successful lookup so we exit the
+        # loop rather than spinning indefinitely.
+        if isinstance(lookup_result, str) and lookup_result.strip():
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"orchestration: non-JSON lookup_result ({len(lookup_result)} chars) "
+                f"→ treating as found, action=continue"
+            )
+            writer({
+                "phase": "orchestration_continue",
+                "node": occurrence_id,
+                "worker": self.name,
+                "lookup_result": lookup_result,
+            })
+            result = self._make_orchestration_result(
+                state, occurrence_id, "continue",
+                loan={"raw_result": lookup_result},
+            )
+            result["messages"] = [AIMessage(
+                content="Account information received. Proceeding with details."
+            )]
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
+                f"END ({time.time() - _t0:.1f}s)"
+            )
+            return result
+        
         # Orchestration did not match — fall through to normal chat
         return None
 

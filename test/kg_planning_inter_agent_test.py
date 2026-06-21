@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from langchain_core.tools import Tool, BaseTool
 from rich.console import Console
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from typing import TypedDict

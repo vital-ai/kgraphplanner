@@ -372,6 +372,7 @@ class KGraphRedisCheckpointer(
         config: Dict[str, Any],
         writes: List[Tuple[str, Any]],
         task_id: str,
+        task_path: str = "",
     ) -> None:
         thread_id, ns, checkpoint_id = self._extract_config(config)
         checkpoint_id = checkpoint_id or task_id
@@ -506,6 +507,7 @@ class KGraphRedisCheckpointer(
         config: Dict[str, Any],
         writes: List[Tuple[str, Any]],
         task_id: str,
+        task_path: str = "",
     ) -> None:
         thread_id, ns, checkpoint_id = self._extract_config(config)
         checkpoint_id = checkpoint_id or task_id

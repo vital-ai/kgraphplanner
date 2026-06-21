@@ -1,6 +1,7 @@
 import logging
+import time
 import contextvars
-from typing import Dict, List, Optional, Any
+from typing import Callable, Dict, List, Optional, Any
 from pathlib import Path
 
 # Request-scoped JWT token — set per async task / request context.
@@ -28,6 +29,9 @@ class ToolManager:
         self.tools: Dict[str, AbstractTool] = {}
         self._tool_functions = {}
         self._jwt_token: Optional[str] = None
+        self._jwt_token_factory: Optional[Callable[[], Optional[str]]] = None
+        self._jwt_token_set_at: float = 0
+        self._jwt_token_ttl: float = 50  # refresh 10s before 60s expiry
     
     def add_tool(self, tool: AbstractTool) -> None:
         """
@@ -152,6 +156,16 @@ class ToolManager:
         """
         _request_jwt.set(jwt_token)
         self._jwt_token = jwt_token
+        self._jwt_token_set_at = time.time()
+    
+    def set_jwt_token_factory(self, factory: Callable[[], Optional[str]]) -> None:
+        """Set a callable that returns a fresh JWT token on demand.
+
+        When a factory is registered, ``get_jwt_token`` will automatically
+        call it to refresh the token when it is near expiry (based on
+        ``_jwt_token_ttl``, default 50 s for a 60 s Keycloak TTL).
+        """
+        self._jwt_token_factory = factory
     
     def get_jwt_token(self) -> Optional[str]:
         """
@@ -160,9 +174,21 @@ class ToolManager:
         Prefers the request-scoped contextvar token (safe for concurrent
         async requests) and falls back to the instance-level token.
         
+        If a token factory is registered and the current token is near
+        expiry, a fresh token is obtained automatically.
+        
         Returns:
             JWT token string or None if not set
         """
+        if (self._jwt_token_factory
+                and time.time() - self._jwt_token_set_at > self._jwt_token_ttl):
+            try:
+                fresh = self._jwt_token_factory()
+                if fresh:
+                    self.set_jwt_token(fresh)
+                    logger.debug("JWT token auto-refreshed via factory")
+            except Exception as e:
+                logger.warning(f"JWT token auto-refresh failed: {e}")
         return _request_jwt.get() or self._jwt_token
     
     def clear_jwt_token(self) -> None:

@@ -36,6 +36,7 @@ class KGraphToolWorker(KGraphWorker):
     tool_manager: Any = None
     available_tool_ids: List[str] = field(default_factory=list)
     summarization_llm: Any = None  # Optional separate LLM for summarization (e.g. low reasoning)
+    summarize_results: bool = True  # When False, skip per-result summarization and preserve raw output
     
     def __post_init__(self):
         """Initialize after dataclass creation."""
@@ -333,12 +334,18 @@ class KGraphToolWorker(KGraphWorker):
             # Add guidance for decision making
             if slot["iters"] == 1:
                 messages.append(SystemMessage(content="Execute ONLY the tool call(s) specified in the request above. Do NOT call any tools beyond what was explicitly requested."))
-            else:
+            elif self.summarize_results:
                 messages.append(SystemMessage(content=(
                     f"Iteration {slot['iters']}. "
                     "If all requested tools have returned results, respond with ONLY a JSON object listing the tool_call_ids to include in the final answer, e.g.:\n"
                     '{"include_summaries": ["call_abc", "call_def"]}\n'
                     "Do NOT restate or summarize the results yourself. If tools are still pending, make the remaining calls."
+                )))
+            else:
+                messages.append(SystemMessage(content=(
+                    f"Iteration {slot['iters']}. "
+                    "If all requested tools have returned results, compose your final answer using "
+                    "the tool results above. If tools are still pending, make the remaining calls."
                 )))
             
             # Add conversation history from THIS worker's own tool_history
@@ -508,30 +515,34 @@ class KGraphToolWorker(KGraphWorker):
 
                     # --- Per-result summarization via summarization_llm ---
                     summary_text = None
-                    try:
-                        _t_sum = time.time()
-                        sum_msgs = [
-                            SystemMessage(content="Summarize the following tool result into a concise, natural-language answer. Return ONLY the summary."),
-                            HumanMessage(content=result_text),
-                        ]
-                        sum_resp = await self.summarization_llm.ainvoke(sum_msgs)
-                        summary_text = getattr(sum_resp, 'content', '') or ''
-                        _sum_elapsed = time.time() - _t_sum
-                        
-                        meta = getattr(sum_resp, 'response_metadata', {}) or {}
-                        usage = meta.get('token_usage') or meta.get('usage', {})
-                        ctd = usage.get('completion_tokens_details') or {}
-                        reasoning_tok = ctd.get('reasoning_tokens', '?') if isinstance(ctd, dict) else '?'
-                        logger.info(
-                            f"📝 [{time.strftime('%H:%M:%S')}] Summarized '{tool_name}' for '{occurrence_id}' "
-                            f"in {_sum_elapsed:.1f}s  summary_len={len(summary_text)}  "
-                            f"prompt_tokens={usage.get('prompt_tokens', '?')}  "
-                            f"completion_tokens={usage.get('completion_tokens', '?')}  "
-                            f"reasoning_tokens={reasoning_tok}"
-                        )
-                    except Exception as sum_err:
-                        logger.warning(f"Summarization failed for '{tool_name}': {sum_err}")
-                        summary_text = result_text  # fallback: use raw compact data
+                    if not self.summarize_results:
+                        summary_text = result_text
+                        logger.debug(f"Skipping summarization for '{tool_name}' (summarize_results=False)")
+                    else:
+                        try:
+                            _t_sum = time.time()
+                            sum_msgs = [
+                                SystemMessage(content="Summarize the following tool result into a concise, natural-language answer. Return ONLY the summary."),
+                                HumanMessage(content=result_text),
+                            ]
+                            sum_resp = await self.summarization_llm.ainvoke(sum_msgs)
+                            summary_text = getattr(sum_resp, 'content', '') or ''
+                            _sum_elapsed = time.time() - _t_sum
+                            
+                            meta = getattr(sum_resp, 'response_metadata', {}) or {}
+                            usage = meta.get('token_usage') or meta.get('usage', {})
+                            ctd = usage.get('completion_tokens_details') or {}
+                            reasoning_tok = ctd.get('reasoning_tokens', '?') if isinstance(ctd, dict) else '?'
+                            logger.info(
+                                f"📝 [{time.strftime('%H:%M:%S')}] Summarized '{tool_name}' for '{occurrence_id}' "
+                                f"in {_sum_elapsed:.1f}s  summary_len={len(summary_text)}  "
+                                f"prompt_tokens={usage.get('prompt_tokens', '?')}  "
+                                f"completion_tokens={usage.get('completion_tokens', '?')}  "
+                                f"reasoning_tokens={reasoning_tok}"
+                            )
+                        except Exception as sum_err:
+                            logger.warning(f"Summarization failed for '{tool_name}': {sum_err}")
+                            summary_text = result_text  # fallback: use raw compact data
                     
                     # Store the full summary by tool_call_id, labeled with tool + args
                     _label_keys = ('query', 'search_query', 'location', 'city')
@@ -731,8 +742,15 @@ class KGraphToolWorker(KGraphWorker):
         # refs, and assemble from stored per-result summaries.
         raw = response.content if hasattr(response, 'content') else str(response)
         stored = slot.get("_summaries", {})
-        content = raw  # fallback
-        if stored:
+
+        if not self.summarize_results:
+            # summarize_results=False: the LLM was asked to compose its own
+            # answer from the raw tool results — use it directly.
+            content = raw
+            logger.debug(f"Using LLM-composed answer ({len(raw)} chars; summarize_results=False)")
+        elif stored:
+            # summarize_results=True: the LLM should have returned a JSON
+            # object with include_summaries refs.  Parse and assemble.
             try:
                 parsed = json.loads(raw.strip().strip('`').removeprefix('json').strip())
                 refs = parsed.get("include_summaries", [])
@@ -745,12 +763,18 @@ class KGraphToolWorker(KGraphWorker):
                         content = "\n\n".join(stored.values())
                         logger.debug(f"No matching refs; using all {len(stored)} stored summaries")
                 else:
-                    content = "\n\n".join(stored.values())
-                    logger.debug(f"No include_summaries in JSON; using all {len(stored)} stored summaries")
+                    # LLM returned valid JSON without include_summaries.
+                    # Preserve the raw JSON — the worker may need structured
+                    # output (e.g. {"found": true, …}) for downstream routing.
+                    content = raw
+                    logger.debug(f"LLM returned valid JSON without include_summaries; preserving raw response ({len(raw)} chars)")
             except (json.JSONDecodeError, ValueError):
-                # LLM didn't return valid JSON — fall back to all stored summaries
+                # Unexpected: LLM didn't follow the include_summaries
+                # guidance — fall back to all stored summaries.
                 content = "\n\n".join(stored.values())
-                logger.debug(f"Could not parse JSON refs; using all {len(stored)} stored summaries")
+                logger.warning(f"Could not parse JSON refs; falling back to all {len(stored)} stored summaries")
+        else:
+            content = raw
         logger.debug(f"Creating final decision with content len={len(content)}")
         
         decision = {
