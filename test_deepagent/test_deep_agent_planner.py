@@ -42,7 +42,7 @@ load_dotenv()
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableSerializable
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.memory import MemorySaver
+from kgraphplanner.checkpointer.kgraphmemory_checkpointer import KGraphMemoryCheckpointer
 
 from deepagents import create_deep_agent
 from deepagents.middleware.subagents import CompiledSubAgent
@@ -502,7 +502,7 @@ async def main():
         planner_llm=planner_llm,
         worker_registry=registry,
         execution_llm=exec_llm,
-        checkpointer=MemorySaver(),
+        checkpointer=KGraphMemoryCheckpointer(),
     )
 
     planner_runnable = PlannerRunnable(planner_agent=planner_agent)
@@ -533,7 +533,7 @@ async def main():
             ),
         ],
         system_prompt=TOP_LEVEL_SYSTEM_PROMPT,
-        checkpointer=MemorySaver(),
+        checkpointer=KGraphMemoryCheckpointer(),
     )
     print(f"  Top-level agent built")
 
