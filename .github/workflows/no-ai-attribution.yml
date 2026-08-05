@@ -1,0 +1,106 @@
+name: No AI attribution
+
+# Git history is a permanent record of what changed and why. Attribution of the
+# tool that typed it is noise there, and it cannot be removed once pushed.
+#
+# This checks commit messages, PR titles and PR bodies only -- never file
+# contents. The repo legitimately talks about Claude and Anthropic in code and
+# docs (model IDs, langchain-anthropic, the model-choice sections of planning
+# docs), so the patterns below match *attribution* specifically. A commit
+# message like "switch eval judge to claude-opus-5" must pass.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches-ignore:
+      - 'dependabot/**'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need history to inspect every commit in the range, not just the tip.
+          fetch-depth: 0
+
+      - name: Check commit messages, PR title and PR body
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -uo pipefail
+
+          # Attribution patterns, case-insensitive. Deliberately narrow: each
+          # matches a way a tool signs its work, not a mention of the tool.
+          PATTERNS='
+          co-authored-by:.*(claude|anthropic|copilot|cursor|codex|chatgpt|openai)
+          noreply@anthropic\.com
+          (generated|created|written|authored|produced) (with|by) .*(claude|chatgpt|copilot|cursor|an ai|ai assistant)
+          🤖
+          this (commit|change|pr) was (generated|written|created) by
+          assisted-by:.*(claude|ai)
+          '
+
+          fail=0
+
+          check() {
+            local label="$1" text="$2"
+            [ -z "$text" ] && return 0
+            while IFS= read -r pattern; do
+              [ -z "$pattern" ] && continue
+              if printf '%s' "$text" | grep -qiE "$pattern"; then
+                echo "::error::${label} contains AI attribution (matched: ${pattern})"
+                printf '%s\n' "$text" | grep -inE "$pattern" | sed 's/^/    /'
+                fail=1
+              fi
+            done <<< "$PATTERNS"
+          }
+
+          if [ "$EVENT" = "pull_request" ]; then
+            check "PR title" "$PR_TITLE"
+            check "PR body"  "$PR_BODY"
+            range="${BASE_SHA}..HEAD"
+          else
+            # Push: check the commits actually pushed. before=000... on a new
+            # branch, in which case fall back to the tip commit alone.
+            before='${{ github.event.before }}'
+            if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+              range="HEAD~1..HEAD"
+              git rev-parse HEAD~1 >/dev/null 2>&1 || range="HEAD"
+            else
+              range="${before}..HEAD"
+            fi
+          fi
+
+          echo "Checking commits in: ${range}"
+          while IFS= read -r sha; do
+            [ -z "$sha" ] && continue
+            check "Commit ${sha:0:8}" "$(git log -1 --format='%B%n%an <%ae>' "$sha")"
+          done < <(git rev-list "$range" 2>/dev/null || true)
+
+          if [ "$fail" -ne 0 ]; then
+            cat <<'MSG'
+
+          ---
+          Remove the attribution and amend or rebase.
+
+          Git history is a permanent engineering record of what changed and why;
+          a trailer naming the tool that typed it is noise, and it cannot be
+          removed once pushed.
+
+          Note this checks commit messages and PR text only. Mentioning Claude,
+          Anthropic or a model ID in a commit message is fine -- "switch eval
+          judge to claude-opus-5" passes. What fails is signing the work.
+          MSG
+            exit 1
+          fi
+
+          echo "No AI attribution found."
