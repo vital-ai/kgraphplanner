@@ -41,8 +41,11 @@ class ToolManager:
             tool: Tool instance to add
         """
         tool_name = tool.get_tool_name()
+        # Build the function first: if it raises, the tool must not be left
+        # half-registered, present in `tools` but absent from `_tool_functions`.
+        tool_function = tool.get_tool_function()
         self.tools[tool_name] = tool
-        self._tool_functions[tool_name] = tool.get_tool_function()
+        self._tool_functions[tool_name] = tool_function
     
     def get_tool(self, tool_name: str) -> Optional[AbstractTool]:
         """
@@ -94,17 +97,16 @@ class ToolManager:
     
     def load_tools_from_config(self) -> None:
         """Load and initialize tools based on configuration."""
-        tool_config = self.config.get_tool_config()
-        
-        # Create tool configuration for individual tools
-        individual_tool_config = {
-            "tool_endpoint": self.config.get_tool_endpoint()
-        }
-        
         # Import and initialize available tools based on enabled list
         enabled_tool_names = self.config.get_enabled_tools()
-        
+
         for tool_name in enabled_tool_names:
+            # Each tool gets the shared settings plus its own config block, so
+            # per-tool settings actually reach the constructor. Previously every
+            # tool received the same {"tool_endpoint": ...} dict and per-tool
+            # blocks such as `web_search` were parsed but never delivered.
+            individual_tool_config = self.config.get_config_for_tool(tool_name)
+
             try:
                 if tool_name == ToolNameEnum.google_web_search_tool.value:
                     from kgraphplanner.tools.websearch.web_search_tool import WebSearchTool
@@ -127,8 +129,23 @@ class ToolManager:
                 elif tool_name == "knowledge_get_document_tool":
                     from kgraphplanner.tools.knowledge.knowledge_get_document_tool import KnowledgeGetDocumentTool
                     knowledge_get_doc_tool = KnowledgeGetDocumentTool(individual_tool_config, self)
+                else:
+                    # Registry-driven rather than another elif per operation: the
+                    # GitHub tools are one per service operation, so the chain
+                    # would eventually carry ~33 entries.
+                    from kgraphplanner.tools.github import GITHUB_TOOLS
+                    if tool_name in GITHUB_TOOLS:
+                        GITHUB_TOOLS[tool_name](individual_tool_config, self)
+                    else:
+                        logger.warning(
+                            f"Enabled tool '{tool_name}' is not a known tool; skipping."
+                        )
             except ImportError as e:
                 logger.warning(f"Could not load tool '{tool_name}': {e}")
+            except Exception as e:
+                # A misconfigured tool (no repos, bad repo format) must not take
+                # down every other tool's registration.
+                logger.error(f"Could not initialise tool '{tool_name}': {e}")
     
     def list_available_tools(self) -> List[str]:
         """List all available tool names. Alias for :meth:`get_tool_names`."""

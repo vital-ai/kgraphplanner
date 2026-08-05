@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+import copy
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -72,10 +73,34 @@ def _env_to_dict(prefix: str = _DEFAULT_ENV_PREFIX) -> Dict[str, Any]:
 
 @dataclass(frozen=True)
 class ToolConfig:
-    """Configuration for the tool subsystem."""
+    """Configuration for the tool subsystem.
+
+    ``tool_configs`` holds per-tool settings keyed by tool name, e.g.::
+
+        {"github_list_issues": {"repos": ["vital-ai/agent-b"]}}
+
+    Any tool can be configured without editing this dataclass. ``ToolManager``
+    merges a tool's block into the config it passes to that tool's constructor,
+    so each instance gets the shared settings plus its own.
+
+    ``web_search`` predates this and is left as-is. No tool reads it — the web
+    search tools take their parameters from the tool call, not from config — so
+    it is kept for callers that read it directly rather than being remapped onto
+    tool names it was never declared to belong to.
+    """
     endpoint: str = "http://localhost:8008"
     enabled: List[str] = field(default_factory=list)
     web_search: Dict[str, Any] = field(default_factory=dict)
+    tool_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+    def config_for(self, tool_name: str) -> Dict[str, Any]:
+        """Per-tool settings for ``tool_name``, or an empty dict.
+
+        Deep-copied: blocks hold nested values (a repo list, for one), and a tool
+        mutating what it was handed must not corrupt the config or another tool's
+        view of it.
+        """
+        return copy.deepcopy(self.tool_configs.get(tool_name, {}))
 
 
 @dataclass(frozen=True)
@@ -179,10 +204,28 @@ class AgentConfig:
     def from_dict(cls, data: Dict[str, Any]) -> AgentConfig:
         """Construct from a plain dictionary (e.g. parsed YAML or JSON)."""
         tools_data = data.get("tools", {})
+
+        # Per-tool blocks live under `tools.tool_configs`, keyed by tool name.
+        # Anything else under `tools` that is a dict and is not one of the
+        # reserved keys is also treated as a per-tool block, so a config can
+        # write `tools: {weather_tool: {...}}` directly.
+        reserved = {"endpoint", "enabled", "web_search", "tool_configs"}
+        tool_configs: Dict[str, Dict[str, Any]] = {
+            name: dict(block)
+            for name, block in tools_data.items()
+            if name not in reserved and isinstance(block, dict)
+        }
+        tool_configs.update({
+            name: dict(block)
+            for name, block in (tools_data.get("tool_configs") or {}).items()
+            if isinstance(block, dict)
+        })
+
         tool_config = ToolConfig(
             endpoint=tools_data.get("endpoint", ToolConfig.endpoint),
             enabled=tools_data.get("enabled", []),
             web_search=tools_data.get("web_search", {}),
+            tool_configs=tool_configs,
         )
 
         model_data = data.get("agent", {}).get("model", {})
@@ -253,7 +296,14 @@ class AgentConfig:
             "endpoint": self.tools.endpoint,
             "enabled": list(self.tools.enabled),
             "web_search": dict(self.tools.web_search),
+            "tool_configs": {k: dict(v) for k, v in self.tools.tool_configs.items()},
         }
+
+    def get_config_for_tool(self, tool_name: str) -> Dict[str, Any]:
+        """Config to hand a tool's constructor: shared settings plus its own block."""
+        config = {"tool_endpoint": self.tools.endpoint}
+        config.update(self.tools.config_for(tool_name))
+        return config
 
     def get_tool_endpoint(self) -> str:
         """Get the tool server endpoint URL."""
