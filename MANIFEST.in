@@ -1,0 +1,26 @@
+# Source-distribution contents.
+#
+# [tool.setuptools.packages.find] controls what is *installed*; it does not
+# control what the sdist carries. Without this file setuptools picked up tests/
+# by default while leaving out test_data/ and github_eval/, which those tests
+# import -- so the sdist shipped a test module that could not even be collected.
+#
+# Excluding them entirely is the consistent choice: the exclude list in
+# pyproject.toml already says these are not part of the distribution, and the
+# suite depends on a schema snapshot mirrored from a service that consumers of
+# this package have no reason to hold.
+
+prune tests
+prune test_data
+prune test_scripts
+prune test_scripts_agents
+prune test_scripts_planner
+prune github_eval
+prune planning
+prune notes
+prune docs
+prune bin
+
+exclude .env
+global-exclude *.py[cod]
+global-exclude .DS_Store
