@@ -81,6 +81,18 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
                 duration_ms=0,
             )
 
+        # Registry-driven: one handler per github_* service tool, all sharing the
+        # same parsing, so adding a service tool is one entry rather than a branch.
+        from kgraphplanner.vital_agent_rest_resource_client.tools.github.tool_handler import (
+            HANDLERS as GITHUB_HANDLERS
+        )
+        if tool_name in GITHUB_HANDLERS:
+            handler = GITHUB_HANDLERS[tool_name]()
+            return ToolResponse.create_success(
+                tool_output=handler.handle_response(tool_parameters, response_json),
+                duration_ms=0,
+            )
+
         # unknown tool
         return ToolResponse(
             tool_name=tool_name,
