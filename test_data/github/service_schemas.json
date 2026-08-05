@@ -1,0 +1,6728 @@
+{
+  "_captured": "2026-08-04",
+  "_service_commit": "4a04846",
+  "_source": "vital-agent-resource-rest /openapi.json",
+  "schemas": {
+    "GitHubActionsCancelRunInput": {
+      "description": "Cancel an in-flight workflow run",
+      "properties": {
+        "operation": {
+          "const": "cancel_workflow_run",
+          "description": "Operation to perform",
+          "enum": [
+            "cancel_workflow_run"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Workflow run id",
+          "minimum": 1.0,
+          "title": "Run Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "run_id"
+      ],
+      "title": "GitHubActionsCancelRunInput",
+      "type": "object"
+    },
+    "GitHubActionsGetRunInput": {
+      "description": "Get a single workflow run",
+      "properties": {
+        "operation": {
+          "const": "get_workflow_run",
+          "description": "Operation to perform",
+          "enum": [
+            "get_workflow_run"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Workflow run id",
+          "minimum": 1.0,
+          "title": "Run Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "run_id"
+      ],
+      "title": "GitHubActionsGetRunInput",
+      "type": "object"
+    },
+    "GitHubActionsListJobsInput": {
+      "description": "List the jobs and step results for a workflow run",
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "enum": [
+                "latest",
+                "all"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "latest",
+          "description": "Which attempt's jobs",
+          "title": "Filter"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum jobs to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_run_jobs",
+          "description": "Operation to perform",
+          "enum": [
+            "list_run_jobs"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Workflow run id",
+          "minimum": 1.0,
+          "title": "Run Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "run_id"
+      ],
+      "title": "GitHubActionsListJobsInput",
+      "type": "object"
+    },
+    "GitHubActionsListRunsInput": {
+      "description": "List workflow runs, optionally filtered",
+      "properties": {
+        "actor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by the login that triggered the run",
+          "title": "Actor"
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by branch name",
+          "title": "Branch"
+        },
+        "event": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by triggering event, e.g. 'push'",
+          "title": "Event"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 20,
+          "description": "Maximum runs to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_workflow_runs",
+          "description": "Operation to perform",
+          "enum": [
+            "list_workflow_runs"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page number for pagination",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "queued",
+                "in_progress",
+                "completed",
+                "success",
+                "failure",
+                "cancelled",
+                "skipped",
+                "timed_out",
+                "action_required"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by run status or conclusion",
+          "title": "Status"
+        },
+        "workflow_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Workflow numeric id or file name (e.g. 'ci.yml'); omit for all workflows",
+          "title": "Workflow Id"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubActionsListRunsInput",
+      "type": "object"
+    },
+    "GitHubActionsListWorkflowsInput": {
+      "description": "List the workflows defined in a repository",
+      "example": {
+        "operation": "list_workflows",
+        "owner": "vital-ai",
+        "repo": "vital-ai-sandbox"
+      },
+      "properties": {
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum workflows to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_workflows",
+          "description": "Operation to perform",
+          "enum": [
+            "list_workflows"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page number for pagination",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubActionsListWorkflowsInput",
+      "type": "object"
+    },
+    "GitHubActionsRerunInput": {
+      "description": "Re-run a workflow run, or only its failed jobs.\n\nShares the workflow-dispatch gate: a re-run executes CI just as a fresh\ndispatch does.",
+      "properties": {
+        "failed_jobs_only": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "Re-run only the jobs that failed",
+          "title": "Failed Jobs Only"
+        },
+        "operation": {
+          "const": "rerun_workflow",
+          "description": "Operation to perform",
+          "enum": [
+            "rerun_workflow"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Workflow run id",
+          "minimum": 1.0,
+          "title": "Run Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "run_id"
+      ],
+      "title": "GitHubActionsRerunInput",
+      "type": "object"
+    },
+    "GitHubActionsRunLogsInput": {
+      "description": "Fetch log text for a workflow run.\n\nGitHub returns logs as a zip archive; the tool unpacks it and returns the\ntail of each job's log, since raw CI logs run to megabytes.",
+      "properties": {
+        "max_files": {
+          "anyOf": [
+            {
+              "maximum": 50.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 10,
+          "description": "Maximum log files to include",
+          "title": "Max Files"
+        },
+        "max_lines_per_file": {
+          "anyOf": [
+            {
+              "maximum": 500.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 50,
+          "description": "Tail lines kept per log file",
+          "title": "Max Lines Per File"
+        },
+        "operation": {
+          "const": "get_run_logs",
+          "description": "Operation to perform",
+          "enum": [
+            "get_run_logs"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "Workflow run id",
+          "minimum": 1.0,
+          "title": "Run Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "run_id"
+      ],
+      "title": "GitHubActionsRunLogsInput",
+      "type": "object"
+    },
+    "GitHubActionsToolOutput": {
+      "description": "Output model for the GitHub actions tool",
+      "example": {
+        "operation": "list_workflow_runs",
+        "repository": "vital-ai/vital-ai-sandbox",
+        "runs": [
+          {
+            "branch": "main",
+            "conclusion": "success",
+            "event": "push",
+            "id": 123456789,
+            "name": "CI",
+            "status": "completed"
+          }
+        ],
+        "tool": "github_actions_tool"
+      },
+      "properties": {
+        "api_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Error message if the GitHub API call failed",
+          "title": "Api Error"
+        },
+        "api_status_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub API status code if the call failed",
+          "title": "Api Status Code"
+        },
+        "dispatch_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explains that workflow_dispatch returns no run id, and how the run was located",
+          "title": "Dispatch Note"
+        },
+        "jobs": {
+          "description": "Jobs in a run",
+          "items": {
+            "$ref": "#/components/schemas/GitHubWorkflowJob"
+          },
+          "title": "Jobs",
+          "type": "array"
+        },
+        "logs": {
+          "description": "Truncated log files",
+          "items": {
+            "$ref": "#/components/schemas/GitHubRunLog"
+          },
+          "title": "Logs",
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to request for the next batch, or null if there is no more. Every list operation on this tool reads exactly one page, so this is the next page and results never repeat.",
+          "title": "Next Page"
+        },
+        "operation": {
+          "description": "Operation that was performed",
+          "title": "Operation",
+          "type": "string"
+        },
+        "rate_limit_remaining": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requests remaining in the current rate limit window",
+          "title": "Rate Limit Remaining"
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository the operation targeted, as 'owner/repo'",
+          "title": "Repository"
+        },
+        "returned_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many records this response actually contains. Always trust this over total_count when deciding what you received.",
+          "title": "Returned Count"
+        },
+        "run": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubWorkflowRun"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Single workflow run"
+        },
+        "runs": {
+          "description": "Workflow runs",
+          "items": {
+            "$ref": "#/components/schemas/GitHubWorkflowRun"
+          },
+          "title": "Runs",
+          "type": "array"
+        },
+        "tool": {
+          "const": "github_actions_tool",
+          "default": "github_actions_tool",
+          "description": "Tool identifier",
+          "enum": [
+            "github_actions_tool"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "total_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Corpus total reported by GitHub for the query, which may exceed returned_count when results are paginated. Use returned_count for what this response contains.",
+          "title": "Total Count"
+        },
+        "triggered": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True if a dispatch was accepted",
+          "title": "Triggered"
+        },
+        "truncated": {
+          "default": false,
+          "description": "True if more results existed than were returned",
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "workflows": {
+          "description": "Workflow definitions",
+          "items": {
+            "$ref": "#/components/schemas/GitHubWorkflow"
+          },
+          "title": "Workflows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "GitHubActionsToolOutput",
+      "type": "object"
+    },
+    "GitHubActionsTriggerInput": {
+      "description": "Trigger a workflow_dispatch run.\n\nGated behind allow_workflow_dispatch (default off) because it executes\narbitrary CI. The workflow file must declare a workflow_dispatch trigger.",
+      "example": {
+        "inputs": {
+          "environment": "staging"
+        },
+        "operation": "trigger_workflow",
+        "owner": "vital-ai",
+        "ref": "main",
+        "repo": "vital-ai-sandbox",
+        "workflow_id": "ci.yml"
+      },
+      "properties": {
+        "inputs": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "workflow_dispatch inputs",
+          "title": "Inputs"
+        },
+        "operation": {
+          "const": "trigger_workflow",
+          "description": "Operation to perform",
+          "enum": [
+            "trigger_workflow"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ref": {
+          "description": "Branch or tag to run against",
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "workflow_id": {
+          "description": "Workflow numeric id or file name (e.g. 'ci.yml')",
+          "minLength": 1,
+          "title": "Workflow Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "workflow_id",
+        "ref"
+      ],
+      "title": "GitHubActionsTriggerInput",
+      "type": "object"
+    },
+    "GitHubAuthenticatedUser": {
+      "properties": {
+        "login": {
+          "description": "Account the service's token authenticates as",
+          "title": "Login",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User or Bot",
+          "title": "Type"
+        }
+      },
+      "required": [
+        "login"
+      ],
+      "title": "GitHubAuthenticatedUser",
+      "type": "object"
+    },
+    "GitHubBranch": {
+      "properties": {
+        "is_default": {
+          "default": false,
+          "description": "True if this is the repository default branch",
+          "title": "Is Default",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Branch name",
+          "title": "Name",
+          "type": "string"
+        },
+        "protected": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True if the branch is protected",
+          "title": "Protected"
+        },
+        "sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commit the branch points at",
+          "title": "Sha"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "GitHubBranch",
+      "type": "object"
+    },
+    "GitHubCodeToolOutput": {
+      "description": "Output model for the GitHub code tool",
+      "example": {
+        "branch": {
+          "is_default": false,
+          "name": "fix/flaky-test",
+          "sha": "abc123"
+        },
+        "operation": "create_branch",
+        "repository": "vital-ai/vital-ai-sandbox",
+        "tool": "github_code_tool"
+      },
+      "properties": {
+        "api_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Error message if the GitHub API call failed",
+          "title": "Api Error"
+        },
+        "api_status_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub API status code if the call failed",
+          "title": "Api Status Code"
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubBranch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Newly created branch"
+        },
+        "commit_result": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubCommitResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Outcome of a multi-file commit"
+        },
+        "delete_result": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubDeleteResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Outcome of a branch or file deletion"
+        },
+        "merge_result": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubMergeResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Outcome of a merge"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to request for the next batch, or null if there is no more. Always use this rather than incrementing `page` yourself. Each tool narrows this description to the behaviour of its own operations.",
+          "title": "Next Page"
+        },
+        "operation": {
+          "description": "Operation that was performed",
+          "title": "Operation",
+          "type": "string"
+        },
+        "rate_limit_remaining": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requests remaining in the current rate limit window",
+          "title": "Rate Limit Remaining"
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository the operation targeted, as 'owner/repo'",
+          "title": "Repository"
+        },
+        "returned_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many records this response actually contains. Always trust this over total_count when deciding what you received.",
+          "title": "Returned Count"
+        },
+        "tool": {
+          "const": "github_code_tool",
+          "default": "github_code_tool",
+          "description": "Tool identifier",
+          "enum": [
+            "github_code_tool"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "description": "True if more results existed than were returned",
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "write_result": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubWriteResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Outcome of a content write"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "GitHubCodeToolOutput",
+      "type": "object"
+    },
+    "GitHubComment": {
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Comment body, truncated if very long",
+          "title": "Body"
+        },
+        "body_truncated": {
+          "default": false,
+          "description": "True if the body was truncated",
+          "title": "Body Truncated",
+          "type": "boolean"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL for the comment",
+          "title": "Html Url"
+        },
+        "id": {
+          "description": "Comment id",
+          "title": "Id",
+          "type": "integer"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp",
+          "title": "Updated At"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login of the comment author",
+          "title": "User"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "GitHubComment",
+      "type": "object"
+    },
+    "GitHubCommit": {
+      "properties": {
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Author login, or name if no account",
+          "title": "Author"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Author date",
+          "title": "Date"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commit message, first line onwards",
+          "title": "Message"
+        },
+        "sha": {
+          "description": "Commit SHA",
+          "title": "Sha",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha"
+      ],
+      "title": "GitHubCommit",
+      "type": "object"
+    },
+    "GitHubCommitResult": {
+      "properties": {
+        "branch": {
+          "description": "Branch the commit landed on",
+          "title": "Branch",
+          "type": "string"
+        },
+        "branch_created": {
+          "default": false,
+          "description": "True if the branch did not exist",
+          "title": "Branch Created",
+          "type": "boolean"
+        },
+        "commit_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA of the new commit",
+          "title": "Commit Sha"
+        },
+        "deleted": {
+          "description": "Paths removed",
+          "items": {
+            "type": "string"
+          },
+          "title": "Deleted",
+          "type": "array"
+        },
+        "forced": {
+          "default": false,
+          "description": "True if the ref was force-updated",
+          "title": "Forced",
+          "type": "boolean"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL for the commit",
+          "title": "Html Url"
+        },
+        "parent_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commit this was based on",
+          "title": "Parent Sha"
+        },
+        "tree_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA of the new tree",
+          "title": "Tree Sha"
+        },
+        "written": {
+          "description": "Paths created or updated",
+          "items": {
+            "type": "string"
+          },
+          "title": "Written",
+          "type": "array"
+        }
+      },
+      "required": [
+        "branch"
+      ],
+      "title": "GitHubCommitResult",
+      "type": "object"
+    },
+    "GitHubCompareRefsInput": {
+      "description": "Compare two refs -- what changed between them",
+      "properties": {
+        "base": {
+          "description": "Base ref (branch, tag or SHA)",
+          "minLength": 1,
+          "title": "Base",
+          "type": "string"
+        },
+        "head": {
+          "description": "Head ref (branch, tag or SHA)",
+          "minLength": 1,
+          "title": "Head",
+          "type": "string"
+        },
+        "include_patch": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "Include diff hunks per file. Off by default -- patches are large.",
+          "title": "Include Patch"
+        },
+        "max_files": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 50,
+          "description": "Maximum changed files to return",
+          "title": "Max Files"
+        },
+        "operation": {
+          "const": "compare_refs",
+          "description": "Operation to perform",
+          "enum": [
+            "compare_refs"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "base",
+        "head"
+      ],
+      "title": "GitHubCompareRefsInput",
+      "type": "object"
+    },
+    "GitHubComparison": {
+      "properties": {
+        "ahead_by": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commits head is ahead of base",
+          "title": "Ahead By"
+        },
+        "behind_by": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commits head is behind base",
+          "title": "Behind By"
+        },
+        "files_changed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Number of files changed",
+          "title": "Files Changed"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ahead, behind, identical or diverged",
+          "title": "Status"
+        },
+        "total_commits": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commits in the comparison",
+          "title": "Total Commits"
+        }
+      },
+      "title": "GitHubComparison",
+      "type": "object"
+    },
+    "GitHubCreateBranchInput": {
+      "description": "Create a branch.\n\nCreates a ref pointing at an existing commit, so it changes no file content\nand is gated by allow_writes rather than allow_content_writes. It lives in\nthis tool anyway: it exists only to carry code changes, and separating it\nfrom the write it precedes would defeat the point of the split.\n\nThis is the operation that makes create_pr reachable.",
+      "properties": {
+        "branch": {
+          "description": "New branch name",
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "from_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Branch or SHA to branch from. Defaults to the default branch.",
+          "title": "From Ref"
+        },
+        "operation": {
+          "const": "create_branch",
+          "description": "Operation to perform",
+          "enum": [
+            "create_branch"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "branch"
+      ],
+      "title": "GitHubCreateBranchInput",
+      "type": "object"
+    },
+    "GitHubDeleteBranchInput": {
+      "description": "Delete a branch.\n\nThe counterpart to create_branch. Without it every branch an agent creates\nis permanent, which makes automated fixtures accumulate refs forever.\n\nRefuses the default branch outright -- not gated, refused: there is no\nlegitimate reason for an agent to delete it, and no config flag should make\nit possible.",
+      "properties": {
+        "branch": {
+          "description": "Branch to delete",
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "operation": {
+          "const": "delete_branch",
+          "description": "Operation to perform",
+          "enum": [
+            "delete_branch"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "branch"
+      ],
+      "title": "GitHubDeleteBranchInput",
+      "type": "object"
+    },
+    "GitHubDeleteFileInput": {
+      "description": "Delete a file, committing the removal.\n\nThe counterpart to create_or_update_file, and gated the same way. Without it\nan agent can add and modify but never remove -- including its own mistakes.",
+      "properties": {
+        "branch": {
+          "description": "Branch to commit on",
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "message": {
+          "description": "Commit message",
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "operation": {
+          "const": "delete_file",
+          "description": "Operation to perform",
+          "enum": [
+            "delete_file"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path within the repository",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Blob SHA of the file being deleted. Required by GitHub; the tool looks it up if omitted.",
+          "title": "Sha"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "path",
+        "message",
+        "branch"
+      ],
+      "title": "GitHubDeleteFileInput",
+      "type": "object"
+    },
+    "GitHubDeleteResult": {
+      "properties": {
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Branch the deletion was committed on",
+          "title": "Branch"
+        },
+        "commit_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commit recording a file deletion",
+          "title": "Commit Sha"
+        },
+        "kind": {
+          "description": "branch or file",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "description": "What was deleted -- a branch name or a file path",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "kind"
+      ],
+      "title": "GitHubDeleteResult",
+      "type": "object"
+    },
+    "GitHubFileContent": {
+      "properties": {
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Decoded text content. Null for binary files and directories.",
+          "title": "Content"
+        },
+        "content_truncated": {
+          "default": false,
+          "description": "True if content was truncated",
+          "title": "Content Truncated",
+          "type": "boolean"
+        },
+        "entries": {
+          "description": "Directory entries, when path is a directory",
+          "items": {
+            "type": "string"
+          },
+          "title": "Entries",
+          "type": "array"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "is_binary": {
+          "default": false,
+          "description": "True if the file could not be decoded as text",
+          "title": "Is Binary",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Path within the repository",
+          "title": "Path",
+          "type": "string"
+        },
+        "sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Blob SHA -- pass to create_or_update_file",
+          "title": "Sha"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Size in bytes",
+          "title": "Size"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "file, dir, symlink or submodule",
+          "title": "Type"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "GitHubFileContent",
+      "type": "object"
+    },
+    "GitHubFileWrite": {
+      "description": "One file in a multi-file commit.",
+      "properties": {
+        "content": {
+          "description": "Full file content as text (not base64)",
+          "title": "Content",
+          "type": "string"
+        },
+        "path": {
+          "description": "Repository-relative path",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ],
+      "title": "GitHubFileWrite",
+      "type": "object"
+    },
+    "GitHubGetAuthenticatedUserInput": {
+      "description": "Return the account the service's token authenticates as.\n\nFor callers that must distinguish their own writes from a third party's: an\nagent conversing on an issue thread has to know which comments are its own,\nand no other operation reveals it.\n\nDeliberately NOT built on GitHubRepoBase. Every other operation is\nrepo-scoped and allowlist-checked; this one is about the token, not a\nrepository, and requiring an owner/repo it never uses would be a field the\ncaller has to invent -- and would imply an allowlist check that does not\napply. It returns only the login and account type: a fuller profile is more\npersonal data on the wire than the use case justifies.",
+      "properties": {
+        "operation": {
+          "const": "get_authenticated_user",
+          "description": "Operation to perform",
+          "enum": [
+            "get_authenticated_user"
+          ],
+          "title": "Operation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "GitHubGetAuthenticatedUserInput",
+      "type": "object"
+    },
+    "GitHubGetCommitInput": {
+      "description": "Get one commit, with the files it changed.\n\nlist_commits gives commit metadata and compare_refs gives a range; neither\ngives a single commit's own diff.",
+      "properties": {
+        "include_patch": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "Include diff hunks per file. Off by default -- patches are large.",
+          "title": "Include Patch"
+        },
+        "max_files": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 50,
+          "description": "Maximum changed files to return",
+          "title": "Max Files"
+        },
+        "operation": {
+          "const": "get_commit",
+          "description": "Operation to perform",
+          "enum": [
+            "get_commit"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ref": {
+          "description": "Commit SHA, branch or tag",
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "ref"
+      ],
+      "title": "GitHubGetCommitInput",
+      "type": "object"
+    },
+    "GitHubGetFileInput": {
+      "description": "Read a file, or list a directory, from the repository.",
+      "properties": {
+        "max_chars": {
+          "anyOf": [
+            {
+              "maximum": 200000.0,
+              "minimum": 100.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 20000,
+          "description": "Truncate file content beyond this many characters",
+          "title": "Max Chars"
+        },
+        "operation": {
+          "const": "get_file_contents",
+          "description": "Operation to perform",
+          "enum": [
+            "get_file_contents"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path within the repository",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Branch, tag or commit SHA. Defaults to the default branch.",
+          "title": "Ref"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "path"
+      ],
+      "title": "GitHubGetFileInput",
+      "type": "object"
+    },
+    "GitHubIssue": {
+      "properties": {
+        "assignees": {
+          "description": "Logins of assignees",
+          "items": {
+            "type": "string"
+          },
+          "title": "Assignees",
+          "type": "array"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Issue body, truncated if very long",
+          "title": "Body"
+        },
+        "body_truncated": {
+          "default": false,
+          "description": "True if the body was truncated",
+          "title": "Body Truncated",
+          "type": "boolean"
+        },
+        "closed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Close timestamp if closed",
+          "title": "Closed At"
+        },
+        "comments": {
+          "default": 0,
+          "description": "Number of comments",
+          "title": "Comments",
+          "type": "integer"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "html_url": {
+          "description": "Browser URL for the issue",
+          "title": "Html Url",
+          "type": "string"
+        },
+        "is_pull_request": {
+          "default": false,
+          "description": "True if this record is actually a pull request",
+          "title": "Is Pull Request",
+          "type": "boolean"
+        },
+        "labels": {
+          "description": "Label names",
+          "items": {
+            "type": "string"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "milestone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Milestone title",
+          "title": "Milestone"
+        },
+        "number": {
+          "description": "Issue number",
+          "title": "Number",
+          "type": "integer"
+        },
+        "state": {
+          "description": "open or closed",
+          "title": "State",
+          "type": "string"
+        },
+        "state_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reason for the current state",
+          "title": "State Reason"
+        },
+        "title": {
+          "description": "Issue title",
+          "title": "Title",
+          "type": "string"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp",
+          "title": "Updated At"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login of the issue author",
+          "title": "User"
+        }
+      },
+      "required": [
+        "number",
+        "title",
+        "state",
+        "html_url"
+      ],
+      "title": "GitHubIssue",
+      "type": "object"
+    },
+    "GitHubIssueAddAssigneesInput": {
+      "description": "Assign users to an issue",
+      "properties": {
+        "assignees": {
+          "description": "Logins to assign",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Assignees",
+          "type": "array"
+        },
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "add_assignees",
+          "description": "Operation to perform",
+          "enum": [
+            "add_assignees"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number",
+        "assignees"
+      ],
+      "title": "GitHubIssueAddAssigneesInput",
+      "type": "object"
+    },
+    "GitHubIssueAddLabelsInput": {
+      "description": "Add labels to an issue, leaving existing labels in place",
+      "properties": {
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "labels": {
+          "description": "Labels to add",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Labels",
+          "type": "array"
+        },
+        "operation": {
+          "const": "add_labels",
+          "description": "Operation to perform",
+          "enum": [
+            "add_labels"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "validate_labels": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "description": "Reject names that do not already exist on the repository. On by default because GitHub creates unknown labels on write, so a typo silently adds a label to the repository. Set false to allow create-on-write. Use list_labels to see valid names.",
+          "title": "Validate Labels"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number",
+        "labels"
+      ],
+      "title": "GitHubIssueAddLabelsInput",
+      "type": "object"
+    },
+    "GitHubIssueCloseInput": {
+      "description": "Close an issue.\n\nGitHub's REST API has no delete-issue endpoint -- closing is the\ndelete-equivalent. Deleting an issue is admin-only and not exposed here.",
+      "properties": {
+        "comment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional comment posted before closing",
+          "title": "Comment"
+        },
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "close_issue",
+          "description": "Operation to perform",
+          "enum": [
+            "close_issue"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "state_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "completed",
+                "not_planned",
+                "duplicate"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "completed",
+          "description": "Why the issue is being closed",
+          "title": "State Reason"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number"
+      ],
+      "title": "GitHubIssueCloseInput",
+      "type": "object"
+    },
+    "GitHubIssueCommentCreateInput": {
+      "description": "Add a comment to an issue",
+      "properties": {
+        "body": {
+          "description": "Comment body in Markdown",
+          "minLength": 1,
+          "title": "Body",
+          "type": "string"
+        },
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "add_comment",
+          "description": "Operation to perform",
+          "enum": [
+            "add_comment"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number",
+        "body"
+      ],
+      "title": "GitHubIssueCommentCreateInput",
+      "type": "object"
+    },
+    "GitHubIssueCommentDeleteInput": {
+      "description": "Delete an issue comment.\n\nComments are genuinely deletable, unlike issues themselves.",
+      "properties": {
+        "comment_id": {
+          "description": "Comment id (not the issue number)",
+          "minimum": 1.0,
+          "title": "Comment Id",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "delete_comment",
+          "description": "Operation to perform",
+          "enum": [
+            "delete_comment"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "comment_id"
+      ],
+      "title": "GitHubIssueCommentDeleteInput",
+      "type": "object"
+    },
+    "GitHubIssueCommentListInput": {
+      "description": "List comments on an issue",
+      "properties": {
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum comments to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_comments",
+          "description": "Operation to perform",
+          "enum": [
+            "list_comments"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only comments updated at or after this ISO 8601 timestamp",
+          "title": "Since"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number"
+      ],
+      "title": "GitHubIssueCommentListInput",
+      "type": "object"
+    },
+    "GitHubIssueCommentUpdateInput": {
+      "description": "Edit an existing issue comment",
+      "properties": {
+        "body": {
+          "description": "Replacement comment body",
+          "minLength": 1,
+          "title": "Body",
+          "type": "string"
+        },
+        "comment_id": {
+          "description": "Comment id (not the issue number)",
+          "minimum": 1.0,
+          "title": "Comment Id",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "update_comment",
+          "description": "Operation to perform",
+          "enum": [
+            "update_comment"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "comment_id",
+        "body"
+      ],
+      "title": "GitHubIssueCommentUpdateInput",
+      "type": "object"
+    },
+    "GitHubIssueCreateInput": {
+      "description": "Create a new issue",
+      "example": {
+        "body": "The web search client test fails intermittently.",
+        "labels": [
+          "bug"
+        ],
+        "operation": "create_issue",
+        "owner": "vital-ai",
+        "repo": "vital-ai-sandbox",
+        "title": "Investigate flaky test"
+      },
+      "properties": {
+        "assignees": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Logins to assign",
+          "title": "Assignees"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Issue body in Markdown",
+          "title": "Body"
+        },
+        "idempotency_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Deterministic identifier for the event this issue represents -- an alert fingerprint, a message id. Supplying it makes the create idempotent: a repeat with the same key returns the original issue instead of filing a duplicate, and the response says which happened via `created` and `idempotency_guard`. The key must derive deterministically from the source event; one that varies per retry (a timestamp, say) provides no guarantee. Requires the service to have idempotency enabled -- a key sent while it is disabled is an error, never a silent unguarded create.",
+          "title": "Idempotency Key"
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Labels to apply",
+          "title": "Labels"
+        },
+        "milestone": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Milestone number",
+          "title": "Milestone"
+        },
+        "operation": {
+          "const": "create_issue",
+          "description": "Operation to perform",
+          "enum": [
+            "create_issue"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "title": {
+          "description": "Issue title",
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "title"
+      ],
+      "title": "GitHubIssueCreateInput",
+      "type": "object"
+    },
+    "GitHubIssueFindByBodyInput": {
+      "description": "Scan issue bodies for a marker, page by page, until found or budget spent.\n\nDistinct from search_issues because GitHub's search index lags creation by\nroughly a minute, which makes it unusable as a duplicate check. This walks\nthe issues list directly, which is read-after-write consistent within a few\nseconds.\n\nDistinct from list_issues because the semantics differ: scan-until-found\nrather than list-first-N, and the answer is only meaningful alongside\n`complete` -- see the field description there.",
+      "properties": {
+        "contains": {
+          "description": "Marker text to look for in issue bodies",
+          "minLength": 1,
+          "title": "Contains",
+          "type": "string"
+        },
+        "include_pull_requests": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "GitHub returns pull requests from the issues endpoint",
+          "title": "Include Pull Requests"
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Narrow the scan to these labels",
+          "title": "Labels"
+        },
+        "match": {
+          "anyOf": [
+            {
+              "enum": [
+                "substring",
+                "line"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "line",
+          "description": "How `contains` must appear. 'line' matches only when some line of the body equals it exactly once stripped -- the right choice for line-anchored marker conventions, where a substring hit that is not a line hit is a false positive. 'substring' matches anywhere.",
+          "title": "Match"
+        },
+        "max_pages": {
+          "anyOf": [
+            {
+              "maximum": 20.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 5,
+          "description": "Pages of 100 to scan before giving up",
+          "title": "Max Pages"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 10,
+          "description": "Stop after this many matches",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "find_issues_by_body",
+          "description": "Operation to perform",
+          "enum": [
+            "find_issues_by_body"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to start scanning from. When a scan returns complete=false it also returns next_page; passing that back resumes where the budget ran out rather than rescanning from the beginning.",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only issues updated at or after this ISO 8601 timestamp. This filters on updated_at, NOT created_at, so it is unsafe as a duplicate-detection bound in either direction -- an old issue edited today is included, and a new issue is excluded if the bound is later than its last update. Use it to speed up polling, never to scope a duplicate check.",
+          "title": "Since"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "all",
+          "description": "Defaults to 'all', unlike list_issues: a closed duplicate is still a duplicate.",
+          "title": "State"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "contains"
+      ],
+      "title": "GitHubIssueFindByBodyInput",
+      "type": "object"
+    },
+    "GitHubIssueGetInput": {
+      "description": "Get a single issue by number",
+      "properties": {
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "get_issue",
+          "description": "Operation to perform",
+          "enum": [
+            "get_issue"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number"
+      ],
+      "title": "GitHubIssueGetInput",
+      "type": "object"
+    },
+    "GitHubIssueListAssignableUsersInput": {
+      "description": "List the users who can be assigned to issues in this repository.\n\nThis is the set GitHub will actually accept -- narrower than collaborators.\nGitHub silently ignores an unassignable login rather than rejecting it, so\nthis is how an agent avoids a write that reports success and does nothing.",
+      "properties": {
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 50,
+          "description": "Maximum users to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_assignable_users",
+          "description": "Operation to perform",
+          "enum": [
+            "list_assignable_users"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubIssueListAssignableUsersInput",
+      "type": "object"
+    },
+    "GitHubIssueListInput": {
+      "description": "List issues in a repository",
+      "example": {
+        "max_results": 10,
+        "operation": "list_issues",
+        "owner": "vital-ai",
+        "repo": "vital-ai-sandbox",
+        "state": "open"
+      },
+      "properties": {
+        "assignee": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login of the assignee, or '*' / 'none'",
+          "title": "Assignee"
+        },
+        "creator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login of the issue creator",
+          "title": "Creator"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "desc",
+          "description": "Sort direction",
+          "title": "Direction"
+        },
+        "include_pull_requests": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "GitHub returns pull requests from the issues endpoint; set true to keep them",
+          "title": "Include Pull Requests"
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only issues carrying all of these labels",
+          "title": "Labels"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum issues to return",
+          "title": "Max Results"
+        },
+        "milestone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Milestone number, '*', or 'none'",
+          "title": "Milestone"
+        },
+        "operation": {
+          "const": "list_issues",
+          "description": "Operation to perform",
+          "enum": [
+            "list_issues"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to start from. This operation may consume several pages to fill max_results after filtering out pull requests, so do not assume the next batch is page+1 -- pass the next_page value from the response, which may repeat a partly-consumed page and can therefore return records you have already seen.",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only issues updated at or after this ISO 8601 timestamp",
+          "title": "Since"
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "enum": [
+                "created",
+                "updated",
+                "comments"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "created",
+          "description": "Sort field",
+          "title": "Sort"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "open",
+          "description": "Issue state filter",
+          "title": "State"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubIssueListInput",
+      "type": "object"
+    },
+    "GitHubIssueListLabelsInput": {
+      "description": "List the labels defined on a repository.\n\nExists so an agent can discover valid label names rather than guessing:\nadd_labels takes free text, and an unknown name creates a new label.",
+      "properties": {
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100,
+          "description": "Maximum labels to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_labels",
+          "description": "Operation to perform",
+          "enum": [
+            "list_labels"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubIssueListLabelsInput",
+      "type": "object"
+    },
+    "GitHubIssueListMilestonesInput": {
+      "description": "List milestones on a repository.\n\ncreate_issue and update_issue take a milestone *number*; this is how an agent\nfinds one.",
+      "properties": {
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum milestones to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_milestones",
+          "description": "Operation to perform",
+          "enum": [
+            "list_milestones"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "open",
+          "description": "Milestone state",
+          "title": "State"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubIssueListMilestonesInput",
+      "type": "object"
+    },
+    "GitHubIssueRemoveAssigneesInput": {
+      "description": "Remove assignees from an issue",
+      "properties": {
+        "assignees": {
+          "description": "Logins to remove",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Assignees",
+          "type": "array"
+        },
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "remove_assignees",
+          "description": "Operation to perform",
+          "enum": [
+            "remove_assignees"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number",
+        "assignees"
+      ],
+      "title": "GitHubIssueRemoveAssigneesInput",
+      "type": "object"
+    },
+    "GitHubIssueRemoveLabelsInput": {
+      "description": "Remove labels from an issue",
+      "properties": {
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "labels": {
+          "description": "Labels to remove",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Labels",
+          "type": "array"
+        },
+        "operation": {
+          "const": "remove_labels",
+          "description": "Operation to perform",
+          "enum": [
+            "remove_labels"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number",
+        "labels"
+      ],
+      "title": "GitHubIssueRemoveLabelsInput",
+      "type": "object"
+    },
+    "GitHubIssueReopenInput": {
+      "description": "Reopen a closed issue",
+      "properties": {
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "operation": {
+          "const": "reopen_issue",
+          "description": "Operation to perform",
+          "enum": [
+            "reopen_issue"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number"
+      ],
+      "title": "GitHubIssueReopenInput",
+      "type": "object"
+    },
+    "GitHubIssueSearchInput": {
+      "description": "Search issues within one repository.\n\nThe repository qualifier is added by the tool; `query` carries only the\nrepo-relative part of GitHub's search syntax.",
+      "example": {
+        "max_results": 10,
+        "operation": "search_issues",
+        "owner": "vital-ai",
+        "query": "is:open label:bug",
+        "repo": "vital-ai-sandbox"
+      },
+      "properties": {
+        "include_pull_requests": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "Search matches pull requests too; set true to keep them",
+          "title": "Include Pull Requests"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum results to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "search_issues",
+          "description": "Operation to perform",
+          "enum": [
+            "search_issues"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "desc",
+          "description": "Sort direction",
+          "title": "Order"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "query": {
+          "description": "Repo-relative GitHub search syntax, e.g. 'is:open label:bug memory leak'. May not contain repo:, org:, or user: qualifiers.",
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "enum": [
+                "created",
+                "updated",
+                "comments"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sort field",
+          "title": "Sort"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "query"
+      ],
+      "title": "GitHubIssueSearchInput",
+      "type": "object"
+    },
+    "GitHubIssueToolOutput": {
+      "description": "Output model for the GitHub issue tool",
+      "example": {
+        "issues": [
+          {
+            "comments": 0,
+            "html_url": "https://github.com/vital-ai/vital-ai-sandbox/issues/1",
+            "is_pull_request": false,
+            "labels": [
+              "bug"
+            ],
+            "number": 1,
+            "state": "open",
+            "title": "Investigate flaky test",
+            "user": "octocat"
+          }
+        ],
+        "operation": "list_issues",
+        "repository": "vital-ai/vital-ai-sandbox",
+        "tool": "github_issue_tool"
+      },
+      "properties": {
+        "api_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Error message if the GitHub API call failed",
+          "title": "Api Error"
+        },
+        "api_status_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub API status code if the call failed",
+          "title": "Api Status Code"
+        },
+        "assignable_users": {
+          "description": "Logins that can be assigned, from list_assignable_users",
+          "items": {
+            "type": "string"
+          },
+          "title": "Assignable Users",
+          "type": "array"
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubComment"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Comment from single-comment operations"
+        },
+        "comments": {
+          "description": "Comments from list operations",
+          "items": {
+            "$ref": "#/components/schemas/GitHubComment"
+          },
+          "title": "Comments",
+          "type": "array"
+        },
+        "complete": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "find_issues_by_body only. True when the scan reached the end of the matching issues, so an empty result establishes absence. False when the page budget ran out first -- absence is NOT established, and treating it as 'no duplicate' is what files the duplicate.",
+          "title": "Complete"
+        },
+        "created": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "create_issue only. False when an existing issue was returned instead of filing a new one. Report 'this was already filed as #N' rather than 'I filed it'.",
+          "title": "Created"
+        },
+        "deleted_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Id of a deleted resource",
+          "title": "Deleted Id"
+        },
+        "idempotency_guard": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which mechanism answered: 'memorydb' (the reservation index, guaranteed), 'scan' (reconciled against GitHub after a lost reservation), or 'none' (the guard was requested but unavailable, so the create went ahead unguarded). Null means no idempotency_key was supplied, so no guarantee was asked for -- distinct from 'none', where one was asked for and could not be given.",
+          "title": "Idempotency Guard"
+        },
+        "issue": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubIssue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Issue from single-issue operations"
+        },
+        "issues": {
+          "description": "Issues from list/search operations",
+          "items": {
+            "$ref": "#/components/schemas/GitHubIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "labels": {
+          "description": "Repository labels, from list_labels",
+          "items": {
+            "$ref": "#/components/schemas/GitHubLabel"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "milestones": {
+          "description": "Repository milestones, from list_milestones",
+          "items": {
+            "$ref": "#/components/schemas/GitHubMilestone"
+          },
+          "title": "Milestones",
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to request for the next batch, or null if there is no more. Always use this rather than incrementing `page` yourself. For list_comments and search_issues it is simply the next page. For list_issues it may skip ahead (several pages can be consumed to fill max_results after filtering out pull requests) or point back at the page just read, when that page was only partly consumed -- GitHub paginates by page with no offset, so resuming mid-page is impossible and this errs toward repeating records rather than skipping them. Deduplicate list_issues results by issue number.",
+          "title": "Next Page"
+        },
+        "operation": {
+          "description": "Operation that was performed",
+          "title": "Operation",
+          "type": "string"
+        },
+        "rate_limit_remaining": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requests remaining in the current rate limit window",
+          "title": "Rate Limit Remaining"
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository the operation targeted, as 'owner/repo'",
+          "title": "Repository"
+        },
+        "returned_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many records this response actually contains. Always trust this over total_count when deciding what you received.",
+          "title": "Returned Count"
+        },
+        "scanned": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Issues examined by find_issues_by_body",
+          "title": "Scanned"
+        },
+        "tool": {
+          "const": "github_issue_tool",
+          "default": "github_issue_tool",
+          "description": "Tool identifier",
+          "enum": [
+            "github_issue_tool"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "total_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Corpus total reported by GitHub for the query, set only where GitHub supplies one (search). It counts records before this tool's own filtering, so with include_pull_requests=false it can exceed returned_count. For list operations GitHub gives no total and this is null -- use returned_count.",
+          "title": "Total Count"
+        },
+        "truncated": {
+          "default": false,
+          "description": "True if more results existed than were returned",
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "GitHubIssueToolOutput",
+      "type": "object"
+    },
+    "GitHubIssueUpdateInput": {
+      "description": "Update an existing issue. Only the fields provided are sent to GitHub.",
+      "properties": {
+        "assignees": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Replace assignees with this set",
+          "title": "Assignees"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New body in Markdown",
+          "title": "Body"
+        },
+        "issue_number": {
+          "description": "Issue number",
+          "minimum": 1.0,
+          "title": "Issue Number",
+          "type": "integer"
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Replace labels with this set",
+          "title": "Labels"
+        },
+        "milestone": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Milestone number",
+          "title": "Milestone"
+        },
+        "operation": {
+          "const": "update_issue",
+          "description": "Operation to perform",
+          "enum": [
+            "update_issue"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New state",
+          "title": "State"
+        },
+        "state_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "completed",
+                "not_planned",
+                "reopened"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reason accompanying a state change",
+          "title": "State Reason"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New title",
+          "title": "Title"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "issue_number"
+      ],
+      "title": "GitHubIssueUpdateInput",
+      "type": "object"
+    },
+    "GitHubLabel": {
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Hex colour, without the leading #",
+          "title": "Color"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Label description",
+          "title": "Description"
+        },
+        "name": {
+          "description": "Label name, as passed to add_labels",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "GitHubLabel",
+      "type": "object"
+    },
+    "GitHubListBranchesInput": {
+      "description": "List branches",
+      "properties": {
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 50,
+          "description": "Maximum branches to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_branches",
+          "description": "Operation to perform",
+          "enum": [
+            "list_branches"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "protected_only": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only protected branches",
+          "title": "Protected Only"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubListBranchesInput",
+      "type": "object"
+    },
+    "GitHubListCommitsInput": {
+      "description": "List commits",
+      "properties": {
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by author login or email",
+          "title": "Author"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum commits to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_commits",
+          "description": "Operation to perform",
+          "enum": [
+            "list_commits"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only commits touching this path",
+          "title": "Path"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Branch, tag or SHA to list from",
+          "title": "Ref"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only commits after this ISO 8601 timestamp",
+          "title": "Since"
+        },
+        "until": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only commits before this ISO 8601 timestamp",
+          "title": "Until"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubListCommitsInput",
+      "type": "object"
+    },
+    "GitHubMergeInput": {
+      "description": "Merge a pull request. Gated behind allow_pr_merge, off by default.\n\nMerging lands commits on the base branch, which is a code change -- which is\nwhy it sits here rather than with the pull request metadata operations.",
+      "properties": {
+        "commit_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Body for the merge commit",
+          "title": "Commit Message"
+        },
+        "commit_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Title for the merge commit",
+          "title": "Commit Title"
+        },
+        "merge_method": {
+          "anyOf": [
+            {
+              "enum": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "merge",
+          "description": "How to merge",
+          "title": "Merge Method"
+        },
+        "operation": {
+          "const": "merge_pr",
+          "description": "Operation to perform",
+          "enum": [
+            "merge_pr"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Head SHA the merge must match; guards against merging newer commits",
+          "title": "Sha"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number"
+      ],
+      "title": "GitHubMergeInput",
+      "type": "object"
+    },
+    "GitHubMergeResult": {
+      "properties": {
+        "merged": {
+          "description": "Whether the merge succeeded",
+          "title": "Merged",
+          "type": "boolean"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Message returned by GitHub",
+          "title": "Message"
+        },
+        "sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA of the merge commit",
+          "title": "Sha"
+        }
+      },
+      "required": [
+        "merged"
+      ],
+      "title": "GitHubMergeResult",
+      "type": "object"
+    },
+    "GitHubMilestone": {
+      "properties": {
+        "closed_issues": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Closed issues in this milestone",
+          "title": "Closed Issues"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Milestone description",
+          "title": "Description"
+        },
+        "due_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Due date, if set",
+          "title": "Due On"
+        },
+        "number": {
+          "description": "Milestone number, as passed to create_issue",
+          "title": "Number",
+          "type": "integer"
+        },
+        "open_issues": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Open issues in this milestone",
+          "title": "Open Issues"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "open or closed",
+          "title": "State"
+        },
+        "title": {
+          "description": "Milestone title",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "title"
+      ],
+      "title": "GitHubMilestone",
+      "type": "object"
+    },
+    "GitHubPRComment": {
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Comment body, truncated if very long",
+          "title": "Body"
+        },
+        "body_truncated": {
+          "default": false,
+          "description": "True if the body was truncated",
+          "title": "Body Truncated",
+          "type": "boolean"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "id": {
+          "description": "Comment id",
+          "title": "Id",
+          "type": "integer"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp",
+          "title": "Updated At"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login of the comment author",
+          "title": "User"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "GitHubPRComment",
+      "type": "object"
+    },
+    "GitHubPRCommentCreateInput": {
+      "description": "Add a conversation comment to a pull request",
+      "properties": {
+        "body": {
+          "description": "Comment body in Markdown",
+          "minLength": 1,
+          "title": "Body",
+          "type": "string"
+        },
+        "operation": {
+          "const": "add_pr_comment",
+          "description": "Operation to perform",
+          "enum": [
+            "add_pr_comment"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number",
+        "body"
+      ],
+      "title": "GitHubPRCommentCreateInput",
+      "type": "object"
+    },
+    "GitHubPRCommentListInput": {
+      "description": "List conversation comments on a pull request.\n\nThese are issue comments. Review comments (anchored to a diff line) are a\ndifferent API and are returned by list_pr_reviews / review endpoints.",
+      "properties": {
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum comments to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_pr_comments",
+          "description": "Operation to perform",
+          "enum": [
+            "list_pr_comments"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page number for pagination",
+          "title": "Page"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number"
+      ],
+      "title": "GitHubPRCommentListInput",
+      "type": "object"
+    },
+    "GitHubPRCreateInput": {
+      "description": "Open a new pull request",
+      "example": {
+        "base": "main",
+        "body": "Adds a retry around the list assertion.",
+        "head": "fix/flaky-test",
+        "operation": "create_pr",
+        "owner": "vital-ai",
+        "repo": "vital-ai-sandbox",
+        "title": "Fix flaky test"
+      },
+      "properties": {
+        "base": {
+          "description": "Branch to merge into",
+          "minLength": 1,
+          "title": "Base",
+          "type": "string"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pull request description in Markdown",
+          "title": "Body"
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "Open as a draft",
+          "title": "Draft"
+        },
+        "head": {
+          "description": "Branch containing the changes",
+          "minLength": 1,
+          "title": "Head",
+          "type": "string"
+        },
+        "maintainer_can_modify": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Allow maintainer edits",
+          "title": "Maintainer Can Modify"
+        },
+        "operation": {
+          "const": "create_pr",
+          "description": "Operation to perform",
+          "enum": [
+            "create_pr"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "title": {
+          "description": "Pull request title",
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "title",
+        "head",
+        "base"
+      ],
+      "title": "GitHubPRCreateInput",
+      "type": "object"
+    },
+    "GitHubPRFile": {
+      "properties": {
+        "additions": {
+          "default": 0,
+          "description": "Lines added",
+          "title": "Additions",
+          "type": "integer"
+        },
+        "changes": {
+          "default": 0,
+          "description": "Total line changes",
+          "title": "Changes",
+          "type": "integer"
+        },
+        "deletions": {
+          "default": 0,
+          "description": "Lines removed",
+          "title": "Deletions",
+          "type": "integer"
+        },
+        "filename": {
+          "description": "Path of the changed file",
+          "title": "Filename",
+          "type": "string"
+        },
+        "patch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Diff hunk, only when include_patch is set",
+          "title": "Patch"
+        },
+        "patch_truncated": {
+          "default": false,
+          "description": "True if the patch was truncated",
+          "title": "Patch Truncated",
+          "type": "boolean"
+        },
+        "previous_filename": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prior path for renames",
+          "title": "Previous Filename"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "added, modified, removed, renamed, ...",
+          "title": "Status"
+        }
+      },
+      "required": [
+        "filename"
+      ],
+      "title": "GitHubPRFile",
+      "type": "object"
+    },
+    "GitHubPRFilesInput": {
+      "description": "List the files a pull request touches",
+      "properties": {
+        "include_patch": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "description": "Include the diff hunk per file. Off by default -- patches are large and blow up an agent's context.",
+          "title": "Include Patch"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 50,
+          "description": "Maximum files to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_pr_files",
+          "description": "Operation to perform",
+          "enum": [
+            "list_pr_files"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page number for pagination",
+          "title": "Page"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number"
+      ],
+      "title": "GitHubPRFilesInput",
+      "type": "object"
+    },
+    "GitHubPRGetInput": {
+      "description": "Get a single pull request",
+      "properties": {
+        "operation": {
+          "const": "get_pr",
+          "description": "Operation to perform",
+          "enum": [
+            "get_pr"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number"
+      ],
+      "title": "GitHubPRGetInput",
+      "type": "object"
+    },
+    "GitHubPRListInput": {
+      "description": "List pull requests",
+      "example": {
+        "operation": "list_prs",
+        "owner": "vital-ai",
+        "repo": "vital-ai-sandbox",
+        "state": "open"
+      },
+      "properties": {
+        "base": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by base branch name",
+          "title": "Base"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "desc",
+          "description": "Sort direction",
+          "title": "Direction"
+        },
+        "head": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by head branch, as 'user:branch'",
+          "title": "Head"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum PRs to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_prs",
+          "description": "Operation to perform",
+          "enum": [
+            "list_prs"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page number for pagination",
+          "title": "Page"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "enum": [
+                "created",
+                "updated",
+                "popularity",
+                "long-running"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "created",
+          "description": "Sort field",
+          "title": "Sort"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "open",
+          "description": "PR state filter",
+          "title": "State"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubPRListInput",
+      "type": "object"
+    },
+    "GitHubPRRequestReviewersInput": {
+      "description": "Ask people to review a pull request.\n\nThis is the last mile of the propose-a-change workflow. Content writes are\nkept off the default branch on the grounds that \"a human reviews before\nanything lands on main\" -- without this operation there is no way for an\nagent to summon that human, and the safety argument rests on a step the\ntools cannot perform.",
+      "properties": {
+        "operation": {
+          "const": "request_reviewers",
+          "description": "Operation to perform",
+          "enum": [
+            "request_reviewers"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "reviewers": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User logins to request review from",
+          "title": "Reviewers"
+        },
+        "team_reviewers": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Team slugs to request review from",
+          "title": "Team Reviewers"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number"
+      ],
+      "title": "GitHubPRRequestReviewersInput",
+      "type": "object"
+    },
+    "GitHubPRReview": {
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Review body, truncated if very long",
+          "title": "Body"
+        },
+        "body_truncated": {
+          "default": false,
+          "description": "True if the body was truncated",
+          "title": "Body Truncated",
+          "type": "boolean"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "id": {
+          "description": "Review id",
+          "title": "Id",
+          "type": "integer"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "APPROVED, CHANGES_REQUESTED, COMMENTED, ...",
+          "title": "State"
+        },
+        "submitted_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Submission timestamp",
+          "title": "Submitted At"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login of the reviewer",
+          "title": "User"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "GitHubPRReview",
+      "type": "object"
+    },
+    "GitHubPRReviewCreateInput": {
+      "description": "Submit a review on a pull request.\n\nAPPROVE is gated behind allow_pr_merge, since an approving review can satisfy\na branch protection rule and unblock a merge. merge_pr itself lives in\ngithub_code_tool -- merging lands commits, which is a code change.",
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Review body; required for REQUEST_CHANGES and COMMENT",
+          "title": "Body"
+        },
+        "event": {
+          "description": "Review verdict",
+          "enum": [
+            "APPROVE",
+            "REQUEST_CHANGES",
+            "COMMENT"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "operation": {
+          "const": "create_pr_review",
+          "description": "Operation to perform",
+          "enum": [
+            "create_pr_review"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number",
+        "event"
+      ],
+      "title": "GitHubPRReviewCreateInput",
+      "type": "object"
+    },
+    "GitHubPRReviewListInput": {
+      "description": "List reviews on a pull request",
+      "properties": {
+        "max_results": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 30,
+          "description": "Maximum reviews to return",
+          "title": "Max Results"
+        },
+        "operation": {
+          "const": "list_pr_reviews",
+          "description": "Operation to perform",
+          "enum": [
+            "list_pr_reviews"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to fetch; this operation reads exactly one page",
+          "title": "Page"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number"
+      ],
+      "title": "GitHubPRReviewListInput",
+      "type": "object"
+    },
+    "GitHubPRToolOutput": {
+      "description": "Output model for the GitHub pull request tool",
+      "example": {
+        "operation": "list_prs",
+        "pull_requests": [
+          {
+            "base": "main",
+            "draft": false,
+            "head": "fix/flaky-test",
+            "html_url": "https://github.com/vital-ai/vital-ai-sandbox/pull/1",
+            "merged": false,
+            "number": 1,
+            "state": "open",
+            "title": "Fix flaky test"
+          }
+        ],
+        "repository": "vital-ai/vital-ai-sandbox",
+        "tool": "github_pr_tool"
+      },
+      "properties": {
+        "api_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Error message if the GitHub API call failed",
+          "title": "Api Error"
+        },
+        "api_status_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub API status code if the call failed",
+          "title": "Api Status Code"
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubPRComment"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Newly created comment"
+        },
+        "comments": {
+          "description": "Conversation comments",
+          "items": {
+            "$ref": "#/components/schemas/GitHubPRComment"
+          },
+          "title": "Comments",
+          "type": "array"
+        },
+        "files": {
+          "description": "Changed files",
+          "items": {
+            "$ref": "#/components/schemas/GitHubPRFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to request for the next batch, or null if there is no more. Every list operation on this tool reads exactly one page, so this is the next page and results never repeat.",
+          "title": "Next Page"
+        },
+        "operation": {
+          "description": "Operation that was performed",
+          "title": "Operation",
+          "type": "string"
+        },
+        "pull_request": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubPullRequest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "PR from single-PR operations"
+        },
+        "pull_requests": {
+          "description": "PRs from list operations",
+          "items": {
+            "$ref": "#/components/schemas/GitHubPullRequest"
+          },
+          "title": "Pull Requests",
+          "type": "array"
+        },
+        "rate_limit_remaining": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requests remaining in the current rate limit window",
+          "title": "Rate Limit Remaining"
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository the operation targeted, as 'owner/repo'",
+          "title": "Repository"
+        },
+        "returned_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many records this response actually contains. Always trust this over total_count when deciding what you received.",
+          "title": "Returned Count"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubPRReview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Newly created review"
+        },
+        "reviews": {
+          "description": "Reviews",
+          "items": {
+            "$ref": "#/components/schemas/GitHubPRReview"
+          },
+          "title": "Reviews",
+          "type": "array"
+        },
+        "tool": {
+          "const": "github_pr_tool",
+          "default": "github_pr_tool",
+          "description": "Tool identifier",
+          "enum": [
+            "github_pr_tool"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "total_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Corpus total reported by GitHub, set only where GitHub supplies one. GitHub gives no total for pull request list endpoints, so this is normally null -- use returned_count.",
+          "title": "Total Count"
+        },
+        "truncated": {
+          "default": false,
+          "description": "True if more results existed than were returned",
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "GitHubPRToolOutput",
+      "type": "object"
+    },
+    "GitHubPRUpdateInput": {
+      "description": "Update a pull request. Only the fields provided are sent.",
+      "properties": {
+        "base": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retarget onto this base branch",
+          "title": "Base"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New description",
+          "title": "Body"
+        },
+        "operation": {
+          "const": "update_pr",
+          "description": "Operation to perform",
+          "enum": [
+            "update_pr"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "pr_number": {
+          "description": "Pull request number",
+          "minimum": 1.0,
+          "title": "Pr Number",
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New state",
+          "title": "State"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "New title",
+          "title": "Title"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "pr_number"
+      ],
+      "title": "GitHubPRUpdateInput",
+      "type": "object"
+    },
+    "GitHubPullRequest": {
+      "properties": {
+        "additions": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lines added",
+          "title": "Additions"
+        },
+        "assignees": {
+          "description": "Logins of assignees",
+          "items": {
+            "type": "string"
+          },
+          "title": "Assignees",
+          "type": "array"
+        },
+        "base": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Base branch name",
+          "title": "Base"
+        },
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Description, truncated if very long",
+          "title": "Body"
+        },
+        "body_truncated": {
+          "default": false,
+          "description": "True if the body was truncated",
+          "title": "Body Truncated",
+          "type": "boolean"
+        },
+        "changed_files": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Number of files changed",
+          "title": "Changed Files"
+        },
+        "closed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Close timestamp",
+          "title": "Closed At"
+        },
+        "comments": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Conversation comment count",
+          "title": "Comments"
+        },
+        "commits": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Number of commits",
+          "title": "Commits"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "deletions": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lines removed",
+          "title": "Deletions"
+        },
+        "draft": {
+          "default": false,
+          "description": "True if the PR is a draft",
+          "title": "Draft",
+          "type": "boolean"
+        },
+        "head": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Head branch name",
+          "title": "Head"
+        },
+        "head_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Head commit SHA",
+          "title": "Head Sha"
+        },
+        "html_url": {
+          "description": "Browser URL",
+          "title": "Html Url",
+          "type": "string"
+        },
+        "labels": {
+          "description": "Label names",
+          "items": {
+            "type": "string"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "mergeable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub's mergeability verdict, if computed",
+          "title": "Mergeable"
+        },
+        "mergeable_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "clean, blocked, dirty, unknown, ...",
+          "title": "Mergeable State"
+        },
+        "merged": {
+          "default": false,
+          "description": "True if the PR has been merged",
+          "title": "Merged",
+          "type": "boolean"
+        },
+        "merged_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Merge timestamp",
+          "title": "Merged At"
+        },
+        "number": {
+          "description": "Pull request number",
+          "title": "Number",
+          "type": "integer"
+        },
+        "requested_reviewers": {
+          "description": "Logins asked to review",
+          "items": {
+            "type": "string"
+          },
+          "title": "Requested Reviewers",
+          "type": "array"
+        },
+        "review_comments": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Review comment count",
+          "title": "Review Comments"
+        },
+        "state": {
+          "description": "open or closed",
+          "title": "State",
+          "type": "string"
+        },
+        "title": {
+          "description": "Pull request title",
+          "title": "Title",
+          "type": "string"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp",
+          "title": "Updated At"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login of the PR author",
+          "title": "User"
+        }
+      },
+      "required": [
+        "number",
+        "title",
+        "state",
+        "html_url"
+      ],
+      "title": "GitHubPullRequest",
+      "type": "object"
+    },
+    "GitHubRepoGetInput": {
+      "description": "Get repository metadata.\n\nChiefly here so an agent can learn the default branch rather than guessing\nit -- `main` is a guess, and wrong on older repositories. Also supplies\nopen_issues_count natively, which otherwise has to be reconstructed from a\nsearch.",
+      "example": {
+        "operation": "get_repo",
+        "owner": "vital-ai",
+        "repo": "vital-ai-sandbox"
+      },
+      "properties": {
+        "operation": {
+          "const": "get_repo",
+          "description": "Operation to perform",
+          "enum": [
+            "get_repo"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation"
+      ],
+      "title": "GitHubRepoGetInput",
+      "type": "object"
+    },
+    "GitHubRepoToolOutput": {
+      "description": "Output model for the GitHub repository tool",
+      "example": {
+        "operation": "get_repo",
+        "repository": "vital-ai/vital-ai-sandbox",
+        "repository_info": {
+          "default_branch": "main",
+          "full_name": "vital-ai/vital-ai-sandbox",
+          "has_issues": true,
+          "open_issues_count": 0,
+          "private": true
+        },
+        "tool": "github_repo_tool"
+      },
+      "properties": {
+        "api_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Error message if the GitHub API call failed",
+          "title": "Api Error"
+        },
+        "api_status_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub API status code if the call failed",
+          "title": "Api Status Code"
+        },
+        "authenticated_user": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubAuthenticatedUser"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Identity the service's token authenticates as"
+        },
+        "branches": {
+          "description": "Branches",
+          "items": {
+            "$ref": "#/components/schemas/GitHubBranch"
+          },
+          "title": "Branches",
+          "type": "array"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubCommit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Single commit, from get_commit"
+        },
+        "commits": {
+          "description": "Commits",
+          "items": {
+            "$ref": "#/components/schemas/GitHubCommit"
+          },
+          "title": "Commits",
+          "type": "array"
+        },
+        "comparison": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubComparison"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Ref comparison summary"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubFileContent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "File or directory contents"
+        },
+        "files": {
+          "description": "Changed files from compare_refs",
+          "items": {
+            "type": "object"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page to request for the next batch, or null if there is no more. Always use this rather than incrementing `page` yourself. Each tool narrows this description to the behaviour of its own operations.",
+          "title": "Next Page"
+        },
+        "operation": {
+          "description": "Operation that was performed",
+          "title": "Operation",
+          "type": "string"
+        },
+        "rate_limit_remaining": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Requests remaining in the current rate limit window",
+          "title": "Rate Limit Remaining"
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository the operation targeted, as 'owner/repo'",
+          "title": "Repository"
+        },
+        "repository_info": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/GitHubRepository"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository metadata"
+        },
+        "returned_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many records this response actually contains. Always trust this over total_count when deciding what you received.",
+          "title": "Returned Count"
+        },
+        "tool": {
+          "const": "github_repo_tool",
+          "default": "github_repo_tool",
+          "description": "Tool identifier",
+          "enum": [
+            "github_repo_tool"
+          ],
+          "title": "Tool",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "description": "True if more results existed than were returned",
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "GitHubRepoToolOutput",
+      "type": "object"
+    },
+    "GitHubRepository": {
+      "properties": {
+        "archived": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True if the repository is archived",
+          "title": "Archived"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "default_branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default branch -- use this as `base` when opening a pull request",
+          "title": "Default Branch"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository description",
+          "title": "Description"
+        },
+        "disabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True if the repository is disabled",
+          "title": "Disabled"
+        },
+        "full_name": {
+          "description": "owner/repo",
+          "title": "Full Name",
+          "type": "string"
+        },
+        "has_issues": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True if the issue tracker is enabled",
+          "title": "Has Issues"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Primary language",
+          "title": "Language"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repository name",
+          "title": "Name"
+        },
+        "open_issues_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub's open issue count. Note this includes open pull requests, since GitHub counts pull requests as issues.",
+          "title": "Open Issues Count"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Owner login",
+          "title": "Owner"
+        },
+        "private": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True if the repository is private",
+          "title": "Private"
+        },
+        "pushed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last push timestamp",
+          "title": "Pushed At"
+        },
+        "topics": {
+          "description": "Repository topics",
+          "items": {
+            "type": "string"
+          },
+          "title": "Topics",
+          "type": "array"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp",
+          "title": "Updated At"
+        }
+      },
+      "required": [
+        "full_name"
+      ],
+      "title": "GitHubRepository",
+      "type": "object"
+    },
+    "GitHubRunLog": {
+      "properties": {
+        "filename": {
+          "description": "Path of the log file inside the archive",
+          "title": "Filename",
+          "type": "string"
+        },
+        "lines": {
+          "description": "Tail of the log file",
+          "items": {
+            "type": "string"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "truncated": {
+          "default": false,
+          "description": "True if earlier lines were dropped",
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "filename"
+      ],
+      "title": "GitHubRunLog",
+      "type": "object"
+    },
+    "GitHubWorkflow": {
+      "properties": {
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "id": {
+          "description": "Workflow id",
+          "title": "Id",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Workflow name",
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Path of the workflow file",
+          "title": "Path"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "active, disabled_manually, ...",
+          "title": "State"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp",
+          "title": "Updated At"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "GitHubWorkflow",
+      "type": "object"
+    },
+    "GitHubWorkflowJob": {
+      "properties": {
+        "completed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Completion timestamp",
+          "title": "Completed At"
+        },
+        "conclusion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Job conclusion",
+          "title": "Conclusion"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "id": {
+          "description": "Job id",
+          "title": "Id",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Job name",
+          "title": "Name",
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Start timestamp",
+          "title": "Started At"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Job status",
+          "title": "Status"
+        },
+        "steps": {
+          "description": "Step results",
+          "items": {
+            "$ref": "#/components/schemas/GitHubWorkflowStep"
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "GitHubWorkflowJob",
+      "type": "object"
+    },
+    "GitHubWorkflowRun": {
+      "properties": {
+        "actor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Login that triggered the run",
+          "title": "Actor"
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Branch the run targeted",
+          "title": "Branch"
+        },
+        "conclusion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "success, failure, cancelled, ...",
+          "title": "Conclusion"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp",
+          "title": "Created At"
+        },
+        "event": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Triggering event",
+          "title": "Event"
+        },
+        "head_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Commit the run built",
+          "title": "Head Sha"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL",
+          "title": "Html Url"
+        },
+        "id": {
+          "description": "Run id",
+          "title": "Id",
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Workflow name",
+          "title": "Name"
+        },
+        "run_attempt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Attempt number",
+          "title": "Run Attempt"
+        },
+        "run_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Run number within the workflow",
+          "title": "Run Number"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "queued, in_progress, completed",
+          "title": "Status"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp",
+          "title": "Updated At"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "GitHubWorkflowRun",
+      "type": "object"
+    },
+    "GitHubWorkflowStep": {
+      "properties": {
+        "conclusion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Step conclusion",
+          "title": "Conclusion"
+        },
+        "name": {
+          "description": "Step name",
+          "title": "Name",
+          "type": "string"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Step number",
+          "title": "Number"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Step status",
+          "title": "Status"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "GitHubWorkflowStep",
+      "type": "object"
+    },
+    "GitHubWriteFileInput": {
+      "description": "Create or update a file, committing the change.\n\nGated by allow_content_writes (default off) -- this is the only operation in\nthe service that writes repository content, which is a different authority\nfrom filing an issue.\n\n`branch` is required rather than defaulting: GitHub would otherwise commit to\nthe default branch, and an omitted field should not be the path to writing on\nmain. Writing to the default branch additionally requires\nallow_default_branch_writes, so the normal flow is create_branch -> write ->\ncreate_pr.",
+      "properties": {
+        "branch": {
+          "description": "Branch to commit on",
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "content": {
+          "description": "Full file content as text (not base64)",
+          "title": "Content",
+          "type": "string"
+        },
+        "message": {
+          "description": "Commit message",
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "operation": {
+          "const": "create_or_update_file",
+          "description": "Operation to perform",
+          "enum": [
+            "create_or_update_file"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path within the repository",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        },
+        "sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Blob SHA of the file being replaced. Required by GitHub when updating an existing file; the tool looks it up if omitted.",
+          "title": "Sha"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "path",
+        "content",
+        "message",
+        "branch"
+      ],
+      "title": "GitHubWriteFileInput",
+      "type": "object"
+    },
+    "GitHubWriteFilesInput": {
+      "description": "Create, update and/or delete several files in ONE commit, via the Git Data API.\n\nThe multi-file counterpart to create_or_update_file. Use it when a change is\nonly correct as a unit -- code plus the test that proves it, or an add plus\nthe delete that makes it a move. Sequential single-file writes cannot express\nthat: a failure part-way through leaves the branch half-applied, in a state\nno record describes.",
+      "properties": {
+        "branch": {
+          "description": "Branch to commit on",
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        },
+        "deletions": {
+          "description": "Repository-relative paths to remove in the same commit",
+          "items": {
+            "type": "string"
+          },
+          "title": "Deletions",
+          "type": "array"
+        },
+        "files": {
+          "description": "Files to create or overwrite",
+          "items": {
+            "$ref": "#/components/schemas/GitHubFileWrite"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "force": {
+          "default": false,
+          "description": "Allow a non-fast-forward branch update, discarding commits the branch had. Required with from_ref. Explicit rather than implied: this is how the idempotent re-run property is achieved and also how history is lost, so it should never be a side effect of an omitted field.",
+          "title": "Force",
+          "type": "boolean"
+        },
+        "from_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Base the commit on this ref instead of the branch's current head. Setting it makes the result a function of the inputs alone -- the branch becomes base + this tree -- so re-running yields the same single-commit diff rather than stacking a commit per attempt. Requires force=true, because it is a non-fast-forward update.",
+          "title": "From Ref"
+        },
+        "message": {
+          "description": "Commit message",
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "operation": {
+          "const": "write_files",
+          "description": "Operation to perform",
+          "enum": [
+            "write_files"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Repository owner (user or organization)",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "repo": {
+          "description": "Repository name",
+          "minLength": 1,
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "operation",
+        "branch",
+        "message"
+      ],
+      "title": "GitHubWriteFilesInput",
+      "type": "object"
+    },
+    "GitHubWriteResult": {
+      "properties": {
+        "blob_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA of the written blob",
+          "title": "Blob Sha"
+        },
+        "branch": {
+          "description": "Branch committed to",
+          "title": "Branch",
+          "type": "string"
+        },
+        "commit_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA of the resulting commit",
+          "title": "Commit Sha"
+        },
+        "created": {
+          "description": "True if the file was created, false if updated",
+          "title": "Created",
+          "type": "boolean"
+        },
+        "html_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser URL for the commit",
+          "title": "Html Url"
+        },
+        "path": {
+          "description": "Path written",
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "branch",
+        "created"
+      ],
+      "title": "GitHubWriteResult",
+      "type": "object"
+    }
+  }
+}
