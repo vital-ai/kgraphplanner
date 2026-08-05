@@ -28,6 +28,10 @@ test_data_internal
 planning
 notes
 kgraphplanner_orig/
-config
-bin
+# Anchored: these name top-level directories, and unanchored patterns match at
+# any depth. Bare `config` also matched kgraphplanner/config/, the package that
+# holds AgentConfig -- its files are tracked so nothing broke, but a NEW file
+# added there would have been silently ignored.
+/config
+/bin
 
