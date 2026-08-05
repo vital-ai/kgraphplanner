@@ -22,6 +22,7 @@ Usage:
 
 import os
 import sys
+import re
 import glob
 import argparse
 import logging
@@ -41,8 +42,9 @@ from kgraphplanner.config.agent_config import AgentConfig
 from kgraphplanner.weaviate.embeddings import get_embeddings
 
 from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain_weaviate import WeaviateVectorStore
+from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,7 @@ DEFAULT_SCHEMA = os.path.join(
 )
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
+MARKDOWN_MAX_CHUNK = 2000  # sections larger than this get a secondary char split
 
 
 # ── Schema helpers ────────────────────────────────────
@@ -73,12 +76,19 @@ def load_schema(schema_path: str) -> dict:
     return data.get("collections", {})
 
 
-def create_collection_from_schema(client, name: str, schema: dict) -> None:
-    """Create a Weaviate collection using a schema definition from YAML."""
-    col_def = schema.get(name)
+def create_collection_from_schema(client, name: str, schema: dict, schema_key: str = "") -> None:
+    """Create a Weaviate collection using a schema definition from YAML.
+
+    Args:
+        name: The actual collection name in Weaviate (may include prefix).
+        schema: Parsed schema dict.
+        schema_key: Key to look up in schema (unprefixed). Defaults to name.
+    """
+    key = schema_key or name
+    col_def = schema.get(key)
     if not col_def:
         raise ValueError(
-            f"No schema definition for '{name}' in config. "
+            f"No schema definition for '{key}' in config. "
             f"Available: {list(schema.keys())}"
         )
 
@@ -103,13 +113,13 @@ def create_collection_from_schema(client, name: str, schema: dict) -> None:
     )
 
 
-def ensure_collection(client, name: str, schema_path: str) -> None:
+def ensure_collection(client, name: str, schema_path: str, schema_key: str = "") -> None:
     """Create the collection if it doesn't already exist."""
     existing = client.collections.list_all()
     if name in existing:
         return
     schema = load_schema(schema_path)
-    create_collection_from_schema(client, name, schema)
+    create_collection_from_schema(client, name, schema, schema_key=schema_key or name)
     print(f"  Auto-created collection '{name}' from schema")
 
 
@@ -148,6 +158,17 @@ def connect() -> tuple:
     return client, wv
 
 
+# ── Prefix helper ─────────────────────────────────────
+
+
+def prefixed_name(name: str, wv) -> str:
+    """Apply the environment collection prefix (e.g. 'Dev' -> 'DevxxxKnowledgeBase')."""
+    prefix = wv.collection_prefix
+    if prefix and not name.startswith(prefix + "xxx"):
+        return prefix + "xxx" + name
+    return name
+
+
 # ── Document helpers ──────────────────────────────────
 
 
@@ -165,7 +186,7 @@ def resolve_paths(path: str, pattern: str = "*.md") -> list[str]:
 
 
 def load_and_split(file_paths: list[str], collection_name: str) -> list:
-    """Load text files, attach metadata, split into chunks."""
+    """Load text files, attach metadata, split into chunks (character-based)."""
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
@@ -182,6 +203,188 @@ def load_and_split(file_paths: list[str], collection_name: str) -> list:
         all_docs.extend(chunks)
         print(f"  {os.path.basename(fp)}: {len(docs)} doc(s) -> {len(chunks)} chunks")
     return all_docs
+
+
+def load_and_split_markdown(file_paths: list[str], collection_name: str) -> list:
+    """Load Markdown files and split on logical header boundaries.
+
+    Uses MarkdownHeaderTextSplitter to split at ## and ### boundaries,
+    preserving the header hierarchy as metadata. Sections that exceed
+    MARKDOWN_MAX_CHUNK chars get a secondary character-based split.
+    """
+    headers_to_split_on = [
+        ("#", "header_1"),
+        ("##", "header_2"),
+        ("###", "header_3"),
+    ]
+    md_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=headers_to_split_on,
+        strip_headers=False,
+    )
+    secondary_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=MARKDOWN_MAX_CHUNK,
+        chunk_overlap=CHUNK_OVERLAP,
+        separators=["\n#### ", "\n\n", "\n", " "],
+    )
+
+    all_docs = []
+    for fp in file_paths:
+        source = os.path.basename(fp)
+        with open(fp, "r", encoding="utf-8") as f:
+            text = f.read()
+
+        md_sections = md_splitter.split_text(text)
+
+        file_chunks = []
+        for section in md_sections:
+            # Build section title from header metadata
+            section_title_parts = []
+            for key in ["header_1", "header_2", "header_3"]:
+                if key in section.metadata:
+                    section_title_parts.append(section.metadata[key])
+            section_title = " > ".join(section_title_parts)
+
+            base_meta = {
+                "source": source,
+                "collection": collection_name,
+                "section": section_title,
+            }
+            # Merge header metadata
+            for key in ["header_1", "header_2", "header_3"]:
+                if key in section.metadata:
+                    base_meta[key] = section.metadata[key]
+
+            content = section.page_content
+
+            if len(content) <= MARKDOWN_MAX_CHUNK:
+                doc = Document(page_content=content, metadata=base_meta.copy())
+                file_chunks.append(doc)
+            else:
+                # Secondary split for oversized sections
+                sub_chunks = secondary_splitter.split_text(content)
+                for i, chunk_text in enumerate(sub_chunks):
+                    meta = base_meta.copy()
+                    meta["sub_chunk"] = i
+                    doc = Document(page_content=chunk_text, metadata=meta)
+                    file_chunks.append(doc)
+
+        all_docs.extend(file_chunks)
+        print(f"  {source}: {len(md_sections)} section(s) -> {len(file_chunks)} chunks (markdown)")
+
+    return all_docs
+
+
+# ── Dialog loading ────────────────────────────────────
+
+VOICE_MAP = {
+    "agent_carly": "carly",
+    "agent_reed": "reed",
+    "agent_morgan": "morgan",
+}
+
+
+def _parse_dialog_metadata(text: str) -> dict:
+    """Extract structured metadata from a dialog markdown file."""
+    meta = {}
+
+    # Phase
+    m = re.search(r"\*\*Phase:\*\*\s*(.+)", text)
+    if m:
+        meta["phase"] = m.group(1).strip()
+
+    # Product
+    m = re.search(r"\*\*Product:\*\*\s*(.+)", text)
+    if m:
+        meta["product"] = m.group(1).strip()
+
+    # Industry
+    m = re.search(r"\*\*Industry:\*\*\s*(.+)", text)
+    if m:
+        meta["industry"] = m.group(1).strip()
+
+    # Personality
+    m = re.search(r"\*\*Personality:\*\*\s*(.+)", text)
+    if m:
+        meta["personality"] = m.group(1).strip()
+
+    # Scenario title from first H1
+    m = re.search(r"^#\s+(.+)", text, re.MULTILINE)
+    if m:
+        meta["scenario"] = m.group(1).strip()
+
+    return meta
+
+
+def load_dialogs(file_paths: list[str], collection_name: str) -> list:
+    """Load dialog files as single documents with voice and scenario metadata.
+
+    Each dialog becomes one Document (not chunked further) since they are
+    typically 3-6KB — suitable for single-embedding retrieval.
+    Voice is derived from the parent folder name (agent_carly -> carly).
+    """
+    all_docs = []
+    for fp in file_paths:
+        source = os.path.basename(fp)
+        parent_dir = os.path.basename(os.path.dirname(fp))
+        voice = VOICE_MAP.get(parent_dir, parent_dir)
+
+        with open(fp, "r", encoding="utf-8") as f:
+            text = f.read()
+
+        meta = _parse_dialog_metadata(text)
+        meta["source"] = source
+        meta["collection"] = collection_name
+        meta["voice"] = voice
+
+        doc = Document(page_content=text, metadata=meta)
+        all_docs.append(doc)
+
+    print(f"  {len(all_docs)} dialog(s) loaded (voice: {voice if all_docs else '?'})")
+    return all_docs
+
+
+# ── Source document storage ───────────────────────────
+
+SOURCE_DOCS_COLLECTION = "SourceDocuments"
+
+
+def store_source_documents(client, file_paths: list[str], collection_name: str, schema_path: str, weaviate_name: str = "") -> int:
+    """Store full document text in SourceDocuments for retrieval by name.
+
+    Each source file gets one object (upsert by source name).
+    No embeddings are computed — this is a pure lookup collection.
+    """
+    actual_name = weaviate_name or SOURCE_DOCS_COLLECTION
+    ensure_collection(client, actual_name, schema_path, schema_key=SOURCE_DOCS_COLLECTION)
+    col = client.collections.get(actual_name)
+
+    stored = 0
+    for fp in file_paths:
+        source = os.path.basename(fp)
+        with open(fp, "r", encoding="utf-8") as f:
+            full_text = f.read()
+
+        # Count chunks for metadata
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP,
+            separators=["\n## ", "\n### ", "\n#### ", "\n\n", "\n", " "],
+        )
+        chunk_count = len(splitter.split_text(full_text))
+
+        # Delete existing entry for this source (upsert)
+        _delete_by_source(col, source)
+
+        # Insert full document
+        col.data.insert({
+            "text": full_text,
+            "source": source,
+            "path": fp,
+            "collection": collection_name,
+            "chunk_count": chunk_count,
+        })
+        stored += 1
+
+    return stored
 
 
 # ── Commands ──────────────────────────────────────────
@@ -206,7 +409,7 @@ def cmd_list(client, wv, args):
 
 def cmd_info(client, wv, args):
     """Show details for a collection."""
-    name = args.collection
+    name = prefixed_name(args.collection, wv)
     try:
         col = client.collections.get(name)
         count = col.aggregate.over_all(total_count=True).total_count
@@ -229,11 +432,12 @@ def cmd_info(client, wv, args):
 
 def cmd_create(client, wv, args):
     """Create an empty collection from YAML schema."""
-    name = args.collection
+    schema_key = args.collection
+    name = prefixed_name(schema_key, wv)
     schema_path = args.schema or DEFAULT_SCHEMA
     try:
         schema = load_schema(schema_path)
-        create_collection_from_schema(client, name, schema)
+        create_collection_from_schema(client, name, schema, schema_key=schema_key)
         print(f"Created collection '{name}' from {schema_path}")
     except Exception as e:
         print(f"Error creating collection: {e}")
@@ -241,17 +445,24 @@ def cmd_create(client, wv, args):
 
 def cmd_load(client, wv, args):
     """Load documents into a collection (auto-creates from schema if needed)."""
-    name = args.collection
+    schema_key = args.collection
+    name = prefixed_name(schema_key, wv)
     schema_path = args.schema or DEFAULT_SCHEMA
     paths = resolve_paths(args.path, args.pattern)
     if not paths:
         print(f"No files found matching: {args.path} (pattern: {args.pattern})")
         return
 
-    ensure_collection(client, name, schema_path)
+    ensure_collection(client, name, schema_path, schema_key=schema_key)
 
-    print(f"Loading {len(paths)} file(s) into '{name}'...")
-    chunks = load_and_split(paths, name)
+    split_mode = getattr(args, "split", "chars")
+    print(f"Loading {len(paths)} file(s) into '{name}' (split: {split_mode})...")
+
+    if split_mode == "markdown":
+        chunks = load_and_split_markdown(paths, name)
+    else:
+        chunks = load_and_split(paths, name)
+
     if not chunks:
         print("No chunks produced.")
         return
@@ -266,10 +477,45 @@ def cmd_load(client, wv, args):
     )
     print(f"Indexed {len(chunks)} chunks into '{name}'")
 
+    # Store full documents for retrieval by name
+    src_name = prefixed_name(SOURCE_DOCS_COLLECTION, wv)
+    stored = store_source_documents(client, paths, name, schema_path, weaviate_name=src_name)
+    print(f"Stored {stored} full document(s) in '{src_name}'")
+
+
+def cmd_load_dialogs(client, wv, args):
+    """Load dialog files into CustomerDialogs with voice and scenario metadata."""
+    schema_key = "CustomerDialogs"
+    collection_name = prefixed_name(schema_key, wv)
+    schema_path = args.schema or DEFAULT_SCHEMA
+    paths = resolve_paths(args.path, args.pattern)
+    if not paths:
+        print(f"No files found matching: {args.path} (pattern: {args.pattern})")
+        return
+
+    ensure_collection(client, collection_name, schema_path, schema_key=schema_key)
+
+    print(f"Loading {len(paths)} dialog(s) into '{collection_name}'...")
+    docs = load_dialogs(paths, collection_name)
+
+    if not docs:
+        print("No documents produced.")
+        return
+
+    embeddings = get_embeddings(wv)
+    WeaviateVectorStore.from_documents(
+        documents=docs,
+        embedding=embeddings,
+        client=client,
+        index_name=collection_name,
+        text_key="text",
+    )
+    print(f"Indexed {len(docs)} dialog(s) into '{collection_name}'")
+
 
 def cmd_update(client, wv, args):
     """Update documents: delete by source, then re-load."""
-    name = args.collection
+    name = prefixed_name(args.collection, wv)
     paths = resolve_paths(args.path, args.pattern)
     if not paths:
         print(f"No files found matching: {args.path}")
@@ -281,8 +527,14 @@ def cmd_update(client, wv, args):
         deleted = _delete_by_source(col, source)
         print(f"  Deleted {deleted} existing chunk(s) for '{source}'")
 
-    print(f"Re-loading {len(paths)} file(s)...")
-    chunks = load_and_split(paths, name)
+    split_mode = getattr(args, "split", "chars")
+    print(f"Re-loading {len(paths)} file(s) (split: {split_mode})...")
+
+    if split_mode == "markdown":
+        chunks = load_and_split_markdown(paths, name)
+    else:
+        chunks = load_and_split(paths, name)
+
     if chunks:
         embeddings = get_embeddings(wv)
         WeaviateVectorStore.from_documents(
@@ -294,14 +546,29 @@ def cmd_update(client, wv, args):
         )
     print(f"Updated {len(chunks)} chunks in '{name}'")
 
+    # Update full documents in SourceDocuments
+    schema_path = args.schema or DEFAULT_SCHEMA
+    src_name = prefixed_name(SOURCE_DOCS_COLLECTION, wv)
+    stored = store_source_documents(client, paths, name, schema_path, weaviate_name=src_name)
+    print(f"Updated {stored} full document(s) in '{src_name}'")
+
 
 def cmd_delete(client, wv, args):
     """Delete documents by source filename."""
-    name = args.collection
+    name = prefixed_name(args.collection, wv)
     col = client.collections.get(name)
+    src_name = prefixed_name(SOURCE_DOCS_COLLECTION, wv)
     for source in args.source:
         deleted = _delete_by_source(col, source)
         print(f"Deleted {deleted} chunk(s) with source='{source}' from '{name}'")
+        # Also remove from SourceDocuments
+        try:
+            src_col = client.collections.get(src_name)
+            src_deleted = _delete_by_source(src_col, source)
+            if src_deleted:
+                print(f"  Also removed {src_deleted} entry from '{src_name}'")
+        except Exception:
+            pass  # SourceDocuments collection may not exist yet
 
 
 def _delete_by_source(col, source: str) -> int:
@@ -319,7 +586,7 @@ def _delete_by_source(col, source: str) -> int:
 
 def cmd_clear(client, wv, args):
     """Delete all objects in a collection (keep schema)."""
-    name = args.collection
+    name = prefixed_name(args.collection, wv)
     if not args.yes:
         confirm = input(f"Delete ALL objects in '{name}'? [y/N] ")
         if confirm.lower() != "y":
@@ -332,7 +599,7 @@ def cmd_clear(client, wv, args):
 
 def cmd_drop(client, wv, args):
     """Drop a collection entirely (schema + data)."""
-    name = args.collection
+    name = prefixed_name(args.collection, wv)
     if not args.yes:
         confirm = input(f"DROP collection '{name}' (schema + data)? [y/N] ")
         if confirm.lower() != "y":
@@ -344,7 +611,7 @@ def cmd_drop(client, wv, args):
 
 def cmd_search(client, wv, args):
     """Search a collection (for testing)."""
-    name = args.collection
+    name = prefixed_name(args.collection, wv)
     query = args.query
     k = args.k
 
@@ -366,7 +633,36 @@ def cmd_search(client, wv, args):
         print("No results found.")
 
 
-# ── CLI entry point ───────────────────────────────────
+def cmd_get(client, wv, args):
+    """Retrieve a full document from SourceDocuments by source name."""
+    source = args.source
+    src_name = prefixed_name(SOURCE_DOCS_COLLECTION, wv)
+    from weaviate.classes.query import Filter
+
+    try:
+        col = client.collections.get(src_name)
+        results = col.query.fetch_objects(
+            filters=Filter.by_property("source").equal(source),
+            limit=1,
+        )
+        if not results.objects:
+            print(f"No document found with source='{source}' in {src_name}")
+            return
+
+        obj = results.objects[0]
+        props = obj.properties
+        print(f"Source:      {props.get('source', '')}")
+        print(f"Path:        {props.get('path', '')}")
+        print(f"Collection:  {props.get('collection', '')}")
+        print(f"Chunks:      {props.get('chunk_count', '?')}")
+        print(f"Text length: {len(props.get('text', ''))} chars")
+        print("\n--- Full text ---\n")
+        print(props.get("text", ""))
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+# ── CLI entry point ───────────────────────────────────────
 
 
 def main():
@@ -394,12 +690,16 @@ def main():
     p.add_argument("path", help="File or directory to load")
     p.add_argument("--pattern", default="*.md", help="Glob pattern (default: *.md)")
     p.add_argument("--schema", default=None, help="Path to YAML schema (default: config/weaviate_collections.yaml)")
+    p.add_argument("--split", choices=["chars", "markdown"], default="chars",
+                   help="Split strategy: 'chars' (fixed-size) or 'markdown' (header-aware logical boundaries)")
 
     # update
     p = sub.add_parser("update", help="Re-index documents (delete + re-load)")
     p.add_argument("collection")
     p.add_argument("path", help="File or directory to update")
     p.add_argument("--pattern", default="*.md", help="Glob pattern (default: *.md)")
+    p.add_argument("--split", choices=["chars", "markdown"], default="chars",
+                   help="Split strategy: 'chars' (fixed-size) or 'markdown' (header-aware logical boundaries)")
 
     # delete
     p = sub.add_parser("delete", help="Delete documents by source filename")
@@ -416,11 +716,21 @@ def main():
     p.add_argument("collection")
     p.add_argument("-y", "--yes", action="store_true", help="Skip confirmation")
 
+    # load-dialogs
+    p = sub.add_parser("load-dialogs", help="Load dialog files into CustomerDialogs with voice metadata")
+    p.add_argument("path", help="Directory containing dialog files (e.g. agent_carly/)")
+    p.add_argument("--pattern", default="*.md", help="Glob pattern (default: *.md)")
+    p.add_argument("--schema", default=None, help="Path to YAML schema")
+
     # search
     p = sub.add_parser("search", help="Search a collection")
     p.add_argument("collection")
     p.add_argument("query")
     p.add_argument("-k", type=int, default=4, help="Number of results (default: 4)")
+
+    # get
+    p = sub.add_parser("get", help="Retrieve a full document by source name")
+    p.add_argument("source", help="Source filename to retrieve")
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
@@ -429,8 +739,10 @@ def main():
     try:
         cmds = {
             "list": cmd_list, "info": cmd_info, "create": cmd_create,
-            "load": cmd_load, "update": cmd_update, "delete": cmd_delete,
+            "load": cmd_load, "load-dialogs": cmd_load_dialogs,
+            "update": cmd_update, "delete": cmd_delete,
             "clear": cmd_clear, "drop": cmd_drop, "search": cmd_search,
+            "get": cmd_get,
         }
         cmds[args.command](client, wv, args)
     finally:
