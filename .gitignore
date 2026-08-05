@@ -6,7 +6,14 @@ dist/*
 !config/weaviate_collections.yaml
 .env
 **/__pycache__/*
-test/*.png
+# Generated agent-graph renders. The rule used to be `test/*.png`; that directory
+# was renamed to test_scripts_agents/, which silently un-ignored six of them.
+test_scripts_agents/*.png
+# Anchored to the root: test_scripts_agents/program_graph.mmd is tracked, and an
+# unanchored pattern matches at any depth, so it would silently start ignoring
+# that file the moment anyone untracked it.
+/program_graph.png
+/program_graph.mmd
 test_output/
 
 test_scripts_internal
