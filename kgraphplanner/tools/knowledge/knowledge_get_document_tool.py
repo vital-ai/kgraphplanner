@@ -4,7 +4,9 @@ import asyncio
 from typing import Callable, Type
 
 from pydantic import BaseModel, Field
-from langchain_core.tools import tool
+from langchain_core.tools import tool, ToolException
+
+from kgraphplanner.tools.tool_errors import fail, reports_failures
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
 
@@ -95,7 +97,7 @@ class KnowledgeGetDocumentTool(AbstractTool):
             logger.info(f"knowledge_get_document_tool: source='{source}' query='{query}' k={k}")
 
             if not source and not query:
-                return json.dumps({"error": "Must provide either 'source' or 'query'", "results": []})
+                fail("Must provide either 'source' or 'query'.")
 
             try:
                 client = self._ensure_client()
@@ -143,11 +145,13 @@ class KnowledgeGetDocumentTool(AbstractTool):
                 mode = "source_lookup" if source else "keyword_search"
                 return json.dumps({"results": docs_out, "count": len(docs_out), "mode": mode}, indent=2)
 
+            except ToolException:
+                raise
             except Exception as e:
-                logger.warning(f"knowledge_get_document_tool error: {e}")
-                return json.dumps({"error": str(e), "results": [], "count": 0})
+                logger.error(f"knowledge_get_document_tool error ({type(e).__name__}): {e}")
+                fail(f"Knowledge base lookup is unavailable (error: {type(e).__name__}: {e})")
 
-        return knowledge_get_document_tool
+        return reports_failures(knowledge_get_document_tool)
 
     @staticmethod
     def _format_obj(obj) -> dict:

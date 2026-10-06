@@ -26,6 +26,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 from pydantic import BaseModel, Field, create_model
 from langchain_core.tools import tool
 
+from kgraphplanner.tools.tool_errors import fail_if_error_payload, reports_failures
+
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
 from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
     VitalAgentRestResourceClient
@@ -187,9 +189,15 @@ class GitHubServiceTool(AbstractTool):
         # repo scope and the pagination rules from the subclass DESCRIPTION.
         @tool(tool_self.TOOL_NAME, description=self.description, args_schema=schema)
         async def _run(**kwargs) -> str:
-            return await tool_self.run(**kwargs)
+            result = await tool_self.run(**kwargs)
+            # run() reports failures as an {"error": ...} payload -- see _error().
+            # That is the internal contract and stays as it is; but returned, it
+            # reaches the agent as ToolMessage(status="success"), indistinguishable
+            # from a successful call. Re-report it here so the status is right.
+            fail_if_error_payload(result)
+            return result
 
-        return _run
+        return reports_failures(_run)
 
     async def run(self, **kwargs) -> str:
         if not self.REQUIRES_REPO:

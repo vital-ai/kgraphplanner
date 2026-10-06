@@ -45,6 +45,18 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
     def _parse_tool_response(self, tool_name: str, tool_parameters: ToolParameters, response_json: dict) -> ToolResponse:
         """Parse the JSON response from the tool server into a ToolResponse."""
 
+        # The service reports a tool that caught its own exception as HTTP 200 with
+        # success=false in the body, and `ToolResponse.to_dict()` there replaces the
+        # null tool_output with {"results": []}. Every branch below calls
+        # create_success unconditionally, so such a failure used to be stamped
+        # successful and reach the agent as a well-formed empty result -- identical
+        # to a search that genuinely matched nothing. The github handler has always
+        # checked this (tools/github/tool_handler.py); the rest did not.
+        if not response_json.get('success', True):
+            msg = response_json.get('error_message') or f'{tool_name} reported failure'
+            self.logger.error(f"Tool server reported failure for {tool_name}: {msg}")
+            return ToolResponse.create_error(error_message=msg, duration_ms=0)
+
         if tool_name == "weather_tool":
             handler = WeatherToolHandler()
             return ToolResponse.create_success(

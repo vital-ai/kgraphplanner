@@ -5,7 +5,9 @@ from typing import Callable, Type
 logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel
-from langchain_core.tools import tool
+from langchain_core.tools import tool, ToolException
+
+from kgraphplanner.tools.tool_errors import check_api_error, fail, reports_failures
 
 from kgraphplanner.vital_agent_rest_resource_client.tools.serper_web_search.models import (
     SerperWebSearchInput,
@@ -65,7 +67,7 @@ class SerperWebSearchTool(AbstractTool):
 
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
-                return "No search results available: tool endpoint is not configured."
+                fail("No search results available: tool endpoint is not configured.")
 
             client_config = {
                 "tool_endpoint": tool_endpoint
@@ -81,10 +83,17 @@ class SerperWebSearchTool(AbstractTool):
                 tool_response = await client.handle_tool_request(ToolNameEnum.serper_web_search_tool.value, serper_input)
 
                 if tool_response is None or not tool_response.success or tool_response.tool_output is None:
-                    logger.warning(f"Serper search tool returned None response for query: {search_query}")
-                    return f"No search results available for query: {search_query}"
+                    detail = getattr(tool_response, "error_message", None) if tool_response else None
+                    logger.error(f"Serper search tool failed for query '{search_query}': {detail}")
+                    fail(f"No search results available for query: {search_query}"
+                         + (f" (error: {detail})" if detail else ""))
 
                 serper_results: SerperWebSearchOutput = tool_response.tool_output
+
+                # An upstream Serper failure arrives as a successful response with
+                # zero results and api_error set. Flattening that to "no results"
+                # tells the model the business does not exist.
+                check_api_error(serper_results)
 
                 results = getattr(serper_results, 'results', None) or []
                 if not results:
@@ -93,9 +102,11 @@ class SerperWebSearchTool(AbstractTool):
 
                 return serper_results
 
+            except ToolException:
+                raise
             except Exception as e:
-                logger.warning(f"Serper search tool error ({type(e).__name__}): {e}")
-                logger.warning(f"Serper search tool traceback:\n{traceback.format_exc()}")
-                return f"No search results available for query: {search_query} (error: {type(e).__name__}: {e})"
+                logger.error(f"Serper search tool error ({type(e).__name__}): {e}")
+                logger.error(f"Serper search tool traceback:\n{traceback.format_exc()}")
+                fail(f"No search results available for query: {search_query} (error: {type(e).__name__}: {e})")
 
-        return serper_web_search_tool
+        return reports_failures(serper_web_search_tool)

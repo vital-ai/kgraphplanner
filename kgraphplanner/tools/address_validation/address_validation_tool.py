@@ -4,7 +4,9 @@ from typing import Callable, Type
 logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel
-from langchain_core.tools import tool
+from langchain_core.tools import tool, ToolException
+
+from kgraphplanner.tools.tool_errors import fail, reports_failures
 
 from kgraphplanner.vital_agent_rest_resource_client.tools.google_address_validation.models import (
     AddressValidationInput, 
@@ -54,10 +56,7 @@ class AddressValidationTool(AbstractTool):
             # Get tool endpoint from config
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
-                return AddressValidationOutput(
-                    tool="google_address_validation_tool",
-                    results=[]
-                )
+                fail("Address validation is unavailable: tool endpoint is not configured.")
             
             # Create client configuration
             client_config = {
@@ -77,22 +76,20 @@ class AddressValidationTool(AbstractTool):
                 tool_response = await client.handle_tool_request(ToolNameEnum.google_address_validation_tool.value, address_validation_input)
                 
                 if not tool_response.success or tool_response.tool_output is None:
-                    logger.warning(f"Address validation tool failed: {tool_response.error_message}")
-                    return AddressValidationOutput(
-                        tool="google_address_validation_tool",
-                        results=[]
-                    )
+                    detail = tool_response.error_message
+                    logger.error(f"Address validation tool failed: {detail}")
+                    fail(f"Address validation is unavailable"
+                         + (f": {detail}" if detail else "."))
                 
                 return tool_response.tool_output
                 
+            except ToolException:
+                raise
             except Exception as e:
-                logger.warning(f"Address validation tool error: {e}")
-                return AddressValidationOutput(
-                    tool="google_address_validation_tool",
-                    results=[]
-                )
+                logger.error(f"Address validation tool error ({type(e).__name__}): {e}")
+                fail(f"Address validation is unavailable (error: {type(e).__name__}: {e})")
         
-        return google_address_validation_tool
+        return reports_failures(google_address_validation_tool)
     
     def validate_address(self, address: str) -> AddressValidationOutput:
         """

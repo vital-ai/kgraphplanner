@@ -6,7 +6,9 @@ import json
 logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
-from langchain_core.tools import tool
+from langchain_core.tools import tool, ToolException
+
+from kgraphplanner.tools.tool_errors import check_api_error, fail, reports_failures
 
 from kgraphplanner.vital_agent_rest_resource_client.tools.web_search.models import (
     WebSearchInput, 
@@ -82,7 +84,7 @@ class WebSearchTool(AbstractTool):
             # Get tool endpoint from config
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
-                return "No web search results available: tool endpoint is not configured."
+                fail("No web search results available: tool endpoint is not configured.")
             
             # Create client configuration
             client_config = {
@@ -102,11 +104,19 @@ class WebSearchTool(AbstractTool):
                 tool_response = await client.handle_tool_request(ToolNameEnum.google_web_search_tool.value, web_search_input)
                 
                 if tool_response is None or not tool_response.success or tool_response.tool_output is None:
-                    logger.warning(f"Web search tool returned None response for query: {search_query}")
-                    return f"No web search results available for query: {search_query}"
+                    detail = getattr(tool_response, "error_message", None) if tool_response else None
+                    logger.error(f"Web search tool failed for query '{search_query}': {detail}")
+                    fail(f"No web search results available for query: {search_query}"
+                         + (f" (error: {detail})" if detail else ""))
                 
                 # Extract results - should be WebSearchOutput
                 web_search_results: WebSearchOutput = tool_response.tool_output
+
+                # An upstream SerpAPI failure arrives as a successful response with
+                # zero results and api_error set. Note the service deliberately
+                # leaves api_error None for a string `error` value, which is its
+                # "no results for this query" message -- a genuine zero result.
+                check_api_error(web_search_results)
                 
                 results = getattr(web_search_results, 'results', None) or []
                 if not results:
@@ -115,12 +125,14 @@ class WebSearchTool(AbstractTool):
                 
                 return web_search_results
                 
+            except ToolException:
+                raise
             except Exception as e:
-                logger.warning(f"Web search tool error ({type(e).__name__}): {e}")
-                logger.warning(f"Web search tool traceback:\n{traceback.format_exc()}")
-                return f"No web search results available for query: {search_query} (error: {type(e).__name__}: {e})"
+                logger.error(f"Web search tool error ({type(e).__name__}): {e}")
+                logger.error(f"Web search tool traceback:\n{traceback.format_exc()}")
+                fail(f"No web search results available for query: {search_query} (error: {type(e).__name__}: {e})")
         
-        return google_web_search_tool
+        return reports_failures(google_web_search_tool)
     
     def execute_search(self, search_query: str, num_results: int = 5) -> WebSearchOutput:
         """

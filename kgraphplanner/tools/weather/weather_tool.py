@@ -4,7 +4,9 @@ from typing import Callable, Type
 logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel
-from langchain_core.tools import tool
+from langchain_core.tools import tool, ToolException
+
+from kgraphplanner.tools.tool_errors import fail, reports_failures
 
 from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import (
     WeatherInput, 
@@ -68,19 +70,7 @@ class WeatherTool(AbstractTool):
             # Get tool endpoint from config
             tool_endpoint = self.config.get("tool_endpoint")
             if not tool_endpoint:
-                # Return error in WeatherOutput format for consistency
-                from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import WeatherData
-                error_weather_data = WeatherData(
-                    latitude=latitude,
-                    longitude=longitude,
-                    timezone="Unknown",
-                    current={},
-                    daily={}
-                )
-                return WeatherOutput(
-                    tool="weather_tool",
-                    weather_data=error_weather_data
-                )
+                fail("Weather is unavailable: tool endpoint is not configured.")
             
             # Create client configuration
             client_config = {
@@ -100,38 +90,19 @@ class WeatherTool(AbstractTool):
                 tool_response = await client.handle_tool_request(ToolNameEnum.weather_tool.value, weather_input)
                 
                 if not tool_response.success or tool_response.tool_output is None:
-                    logger.warning(f"Weather tool failed: {tool_response.error_message}")
-                    from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import WeatherData
-                    error_weather_data = WeatherData(
-                        latitude=latitude,
-                        longitude=longitude,
-                        timezone="Unknown",
-                        current={},
-                        daily={}
-                    )
-                    return WeatherOutput(
-                        tool="weather_tool",
-                        weather_data=error_weather_data
-                    )
+                    detail = tool_response.error_message
+                    logger.error(f"Weather tool failed: {detail}")
+                    fail(f"Weather is unavailable" + (f": {detail}" if detail else "."))
                 
                 return tool_response.tool_output
                 
+            except ToolException:
+                raise
             except Exception as e:
-                logger.warning(f"Weather tool error: {e}")
-                from kgraphplanner.vital_agent_rest_resource_client.tools.weather.models import WeatherData
-                error_weather_data = WeatherData(
-                    latitude=latitude,
-                    longitude=longitude,
-                    timezone="Unknown",
-                    current={},
-                    daily={}
-                )
-                return WeatherOutput(
-                    tool="weather_tool",
-                    weather_data=error_weather_data
-                )
+                logger.error(f"Weather tool error ({type(e).__name__}): {e}")
+                fail(f"Weather is unavailable (error: {type(e).__name__}: {e})")
         
-        return weather_tool
+        return reports_failures(weather_tool)
     
     def get_weather(self, place_label: str, latitude: float, longitude: float, 
                    include_previous: bool = False, use_archive: bool = False, 

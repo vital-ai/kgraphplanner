@@ -4,7 +4,9 @@ import asyncio
 from typing import Callable, Type
 
 from pydantic import BaseModel, Field
-from langchain_core.tools import tool
+from langchain_core.tools import tool, ToolException
+
+from kgraphplanner.tools.tool_errors import fail, reports_failures
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
 
@@ -202,8 +204,13 @@ class KnowledgeSearchTool(AbstractTool):
                     {"results": results, "count": len(results), "search_type": effective_type}, indent=2
                 )
 
+            except ToolException:
+                raise
             except Exception as e:
-                logger.warning(f"knowledge_search_tool error: {e}")
-                return json.dumps({"error": str(e), "results": [], "count": 0})
+                # A connection or auth failure is not "the KB had no match".
+                # Returning an empty result set here answered merchant
+                # questions from nothing, at warning level, for hours.
+                logger.error(f"knowledge_search_tool error ({type(e).__name__}): {e}")
+                fail(f"Knowledge base search is unavailable (error: {type(e).__name__}: {e})")
 
-        return knowledge_search_tool
+        return reports_failures(knowledge_search_tool)

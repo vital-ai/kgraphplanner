@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kgraphplanner"
-version = "0.1.4"
+version = "0.1.5"
 description = "KGraph Planner"
 readme = "README.md"
 license = {text = "Apache License 2.0"}
@@ -46,7 +46,13 @@ dependencies = [
     "pyyaml",
     "vital-agentbox[client]>=0.1.4",
     "vital-graph[client]>=0.0.38",
-    "deepagents>=0.6.11",
+    # Ceiling only -- the floor is left alone so consumers on 0.6.x are not forced
+    # to move. Unbounded, the resolved version was not merely "newest that day"
+    # but non-deterministic: the same declared constraints resolve to 0.7.13 or
+    # 0.7.22 depending on pip's backtracking path. Note 0.7.18 made the `task`
+    # tool reject unknown arguments instead of dropping them, so raise this
+    # deliberately rather than by accident.
+    "deepagents>=0.6.11,<0.8",
 ]
 
 [project.optional-dependencies]
