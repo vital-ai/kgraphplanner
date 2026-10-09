@@ -175,7 +175,9 @@ are usually a parallel fan-out, so a condition there is a **guard**:
 
 Guards see `result` = the start data (after `start_data`, the injected last
 human message and the `StartNodeSpec` defaults are applied), plus `results`
-and `run`. `max_traversals`, `on_exhausted` and `on_error` aren't allowed on
+and `run`. They are evaluated once per run, when the run starts, so a guard
+on `run.now` or `run.time_left` gives one answer for the whole start step.
+`max_traversals`, `on_exhausted` and `on_error` aren't allowed on
 start edges.
 
 Example: run five classifiers in parallel, but skip the reactive one when a
@@ -190,7 +192,8 @@ EdgeSpec(source="start", destination="blocker_classifier", bindings=...),
 ```
 
 **A skipped node writes no result, and a binding from a node that hasn't run
-is skipped,** so it doesn't write `None`. Give the downstream node a default
+is skipped,** so it doesn't write `None`. This applies to bindings on every
+edge, not only after a start guard (see "Changes in 0.2.1", item 6). Give the downstream node a default
 for that arg (`WorkerNodeSpec.defaults["args"]`) when it needs an explicit
 "absent" value:
 
@@ -685,15 +688,21 @@ These changes alter behaviour that existing specs may rely on:
    identifiers, error bodies, raw responses or tracebacks in tool logs. What
    tools return to the model is unchanged. Every tool's config now includes
    `log_content`.
-3. **`concat_text`** no longer raises on a `None` or non-string value, and a
-   binding error names its edge and params.
+3. **`concat_text`** no longer raises on a `None` or non-string value. A
+   binding error is raised unchanged (same type and message), with a note
+   naming its edge and params; the note holds no bound values.
 4. **A caller-seeded `results["start"]` keeps the `StartNodeSpec` defaults**
    for keys it omits. They used to be replaced, so omitted keys resolved to
    `None`.
-5. **Conditions on start edges are guards** (new). A binding from a node that
-   hasn't run is now skipped instead of writing `None`. `KGraphPlannerAgent`
-   rejects a `ConditionalSpec` from `start`.
-6. **`presence_gate`** (new) and optional worker descriptions in the planner
+5. **Conditions on start edges are guards** (new), evaluated once when the
+   run starts. `KGraphPlannerAgent` rejects a `ConditionalSpec` from `start`.
+6. **A binding from a node that hasn't run is skipped, on every edge.** It
+   used to write `None` into the destination's args, over a node default or
+   an earlier binding. Now the param is left as it was. A binding to a path
+   that is missing on a node that *did* run still resolves to `None`. This
+   matters wherever a destination is reached after a skipped branch: a
+   start guard, a conditional route, or a fan-in from a node that didn't run.
+7. **`presence_gate`** (new) and optional worker descriptions in the planner
    prompt.
-7. **Case and chat workers use the first non-empty input key.** An empty
+8. **Case and chat workers use the first non-empty input key.** An empty
    `query` used to win over a set `input` / `message`.

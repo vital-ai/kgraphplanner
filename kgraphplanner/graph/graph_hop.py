@@ -164,10 +164,12 @@ def merge_activation(
     try:
         return _merge_activation(prev, node_defaults, edge, results_by_node)
     except Exception as e:
-        # A bad binding otherwise surfaces from an anonymous hop node.
-        raise ValueError(
-            f"Could not build inputs for edge '{edge.source}' -> '{edge.destination}' "
-            f"(bindings {sorted(edge.bindings)}): {type(e).__name__}: {e}") from e
+        # A bad binding otherwise surfaces from an anonymous hop node. Name the
+        # edge in a note on the original exception: its type and message are
+        # unchanged, and the note holds no bound values.
+        e.add_note(f"While building inputs for edge '{edge.source}' -> "
+                   f"'{edge.destination}' (bindings {sorted(edge.bindings or {})})")
+        raise
 
 
 def _merge_activation(

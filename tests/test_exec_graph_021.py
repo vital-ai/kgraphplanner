@@ -82,8 +82,22 @@ def test_binding_error_names_the_edge():
     # A json transform of a value that can't be serialised fails inside the hop.
     edge = EdgeSpec(source="plan", destination="content",
                     bindings={"x": b("plan", "$.y", transform="json")})
-    with pytest.raises(ValueError, match="'plan' -> 'content'.*\\['x'\\]"):
+    with pytest.raises(TypeError) as info:
         merge_activation({}, {}, edge, {"plan": {"y": object()}})
+    # The original exception, with the edge named in a note.
+    assert "not JSON serializable" in str(info.value)
+    assert any("'plan' -> 'content'" in n and "['x']" in n for n in info.value.__notes__)
+
+
+def test_binding_error_note_holds_no_bound_values():
+    # json.dumps of a set raises TypeError; the note must not echo the value.
+    secret = "SSN-123-45-6789"
+    edge = EdgeSpec(source="plan", destination="content",
+                    bindings={"x": b("plan", "$.y", transform="json")})
+    with pytest.raises(TypeError) as info:
+        merge_activation({}, {}, edge, {"plan": {"y": {secret}}})
+    assert info.value.__notes__
+    assert not any(secret in n for n in info.value.__notes__)
 
 
 async def test_binding_from_a_node_that_has_not_run_is_skipped():
@@ -169,6 +183,26 @@ class TestStartGuards:
                                 EdgeSpec(source="a", destination="end")])
         with pytest.raises(ExecGraphRoutingError, match="start"):
             await KGraphExecGraphAgent(name="n", graph_spec=spec, worker_registry=workers).run({})
+
+    async def test_guards_are_evaluated_once_per_run(self, monkeypatch):
+        # A guard on run.now or run.time_left can change between evaluations.
+        # Simulate one that holds the first time and fails after: the router
+        # and the gather must agree, so the reactive branch runs with its
+        # binding rather than with defaults only.
+        import kgraphplanner.agent.kgraph_exec_graph_agent as exec_mod
+        real = exec_mod.evaluate_condition
+        calls = []
+
+        def flips(cond, *, source, context):
+            if source != "start":
+                return real(cond, source=source, context=context)
+            calls.append(1)
+            return len(calls) == 1
+
+        monkeypatch.setattr(exec_mod, "evaluate_condition", flips)
+        result = await nurture_graph().run({"inbound_message": "hi"})
+        assert len(calls) == 1
+        assert result.results["resolver"]["seen"]["reactive"] == "reactive:hi"
 
     async def test_several_start_edges_into_one_node_merge_only_fired_ones(self):
         agent = nurture_graph(extra_start_edges=[

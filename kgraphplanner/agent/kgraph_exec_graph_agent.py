@@ -226,6 +226,9 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
         by_id = {node.id: node for node in spec.nodes}
         start_node = next((n for n in spec.nodes if isinstance(n, StartNodeSpec)), None)
         inject_key = self.inject_last_human_as
+        # Set below once start edges are classified: fired(start, run) -> the
+        # indices of the start edges whose guards hold this run.
+        start_guard_eval: Dict[str, Any] = {}
 
         # --- Entry node: reset per-run state and seed start results ---
         def entry_node(state: AgentState) -> AgentState:
@@ -264,6 +267,7 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             if deadline is None and spec.timeout_seconds:
                 deadline = now + spec.timeout_seconds
             grace = run_input.get("grace", DEFAULT_DEADLINE_GRACE)
+            run = {"started_at": now, "deadline": deadline, "grace": grace}
 
             # Everything below is per run. On a reused checkpointed thread,
             # results from an earlier turn would otherwise be visible to
@@ -279,9 +283,16 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 "failed_nodes": replace_value({}),
                 "usage_log": replace_value({}),
                 "usage_total": replace_value({}),
-                "run": replace_value({"started_at": now, "deadline": deadline, "grace": grace}),
+                "run": replace_value(run),
                 "run_input": replace_value(None),
             }
+            # Start guards are evaluated once, here, and the router and the
+            # start-guard gathers read the stored result. Evaluating them in
+            # each could disagree on a guard over run.now or run.time_left.
+            if "fired" in start_guard_eval:
+                fired = start_guard_eval["fired"](
+                    start, run_context({"agent_data": {"run": run}}))
+                update["start_guards"] = replace_value(sorted(fired))
             # Worker scratch slots (e.g. the tool worker's history) too.
             stale_work = {slot: {} for slot in (state.get("work") or {})}
             return {"agent_data": update, "work": stale_work}
@@ -388,18 +399,19 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
 
             return gather
 
-        def _make_start_guard_gather(edges: List[EdgeSpec], dest_node_id: str, fired_start_edges):
-            """Like a gather, but merges only the start edges whose guards fired."""
+        def _make_start_guard_gather(edges: List[Tuple[int, EdgeSpec]], dest_node_id: str):
+            """Like a gather, but merges only the start edges whose guards fired
+            (as recorded by entry_node)."""
             dest_defaults, reset = _dest_defaults(dest_node_id)
 
             def start_guard_gather(state: AgentState) -> AgentState:
                 agent_data = state.get("agent_data") or {}
                 results = agent_data.get("results") or {}
-                fired = fired_start_edges(state)
+                fired = set(agent_data.get("start_guards") or ())
                 act = {"prompt": "", "args": {}} if reset else (agent_data.get("activation") or {}).get(
                     dest_node_id, {"prompt": "", "args": {}})
-                for edge in edges:
-                    if id(edge) in fired:
+                for index, edge in edges:
+                    if index in fired:
                         act = merge_activation(act, dest_defaults, edge, results)
                 return {"agent_data": {
                     "activation": {dest_node_id: act},
@@ -479,14 +491,16 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 graph.add_edge(gather_id, entry_for[dest_id])
 
         if guarded:
-            fired_start_edges = self._make_start_guard_evaluator(active_start)
-            for dest_id, guard_id, dest_edges in guarded:
-                graph.add_node(guard_id, _make_start_guard_gather(
-                    dest_edges, dest_id, fired_start_edges))
+            start_guard_eval["fired"] = self._make_start_guard_evaluator(active_start)
+            index_of = {id(e): i for i, e in enumerate(active_start)}
+            indexed = [(dest_id, guard_id, [(index_of[id(e)], e) for e in dest_edges])
+                       for dest_id, guard_id, dest_edges in guarded]
+            for dest_id, guard_id, dest_edges in indexed:
+                graph.add_node(guard_id, _make_start_guard_gather(dest_edges, dest_id))
                 graph.add_edge(guard_id, entry_for[dest_id])
             graph.add_conditional_edges(
                 "__entry__",
-                self._make_start_router(guarded, fired_start_edges),
+                self._make_start_router(indexed),
                 {guard_id: guard_id for _, guard_id, _ in guarded},
             )
 
@@ -599,38 +613,38 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
         return graph
 
     def _make_start_guard_evaluator(self, start_edges: List[EdgeSpec]):
-        """Returns ``fired(state) -> set of id(edge)`` for the active start edges.
+        """Returns ``fired(start, run) -> set of indices into start_edges``.
 
-        Guards see ``result`` = the start data (after entry_node built it),
-        ``results`` and ``run``; ``traversals`` is empty at the start.
+        Guards see ``result`` = the start data (as entry_node built it),
+        ``results`` = ``{"start": ...}`` and ``run``; ``traversals`` is empty
+        at the start.
         """
         guards = {
-            id(e): parse_condition(e.condition, source="start",
-                                   allow_expressions=self.allow_expressions)
-            for e in start_edges if e.condition is not None
+            i: parse_condition(e.condition, source="start",
+                               allow_expressions=self.allow_expressions)
+            for i, e in enumerate(start_edges) if e.condition is not None
         }
 
-        def fired(state: AgentState) -> set:
-            agent_data = state.get("agent_data") or {}
-            results = agent_data.get("results") or {}
+        def fired(start: Any, run: Dict[str, Any]) -> set:
+            result = start if start is not None else {}
             context = {
-                "result": results.get("start", {}),
-                "results": results,
+                "result": result,
+                "results": {"start": result},
                 "traversals": {},
-                "run": run_context(state),
+                "run": run,
             }
             out: set = set()
             defaults = []
-            for e in start_edges:
-                guard = guards.get(id(e))
+            for i in range(len(start_edges)):
+                guard = guards.get(i)
                 if guard is None:
-                    out.add(id(e))
+                    out.add(i)
                 elif guard.is_default:
-                    defaults.append(e)
+                    defaults.append(i)
                 elif evaluate_condition(guard, source="start", context=context):
-                    out.add(id(e))
+                    out.add(i)
             if not out:
-                out.update(id(e) for e in defaults)
+                out.update(defaults)
             if not out:
                 raise ExecGraphRoutingError("start", context["result"])
             return out
@@ -638,13 +652,14 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
         return fired
 
     @staticmethod
-    def _make_start_router(guarded, fired_start_edges):
+    def _make_start_router(guarded):
         """Router on __entry__: the start-guard gathers with at least one
-        fired edge. Static start edges run alongside it."""
+        fired edge (as recorded by entry_node). Static start edges run
+        alongside it."""
         def start_router(state: AgentState) -> List[str]:
-            fired = fired_start_edges(state)
+            fired = set((state.get("agent_data") or {}).get("start_guards") or ())
             chosen = [guard_id for _, guard_id, edges in guarded
-                      if any(id(e) in fired for e in edges)]
+                      if any(index in fired for index, _ in edges)]
             logger.info(f"Start guards: {len(chosen)}/{len(guarded)} guarded destination(s) fired")
             return chosen
         return start_router
