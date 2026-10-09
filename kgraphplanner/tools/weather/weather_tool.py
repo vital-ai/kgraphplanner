@@ -18,6 +18,7 @@ from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_cl
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import describe_error, logged
 
 
 class WeatherTool(AbstractTool):
@@ -74,7 +75,8 @@ class WeatherTool(AbstractTool):
             
             # Create client configuration
             client_config = {
-                "tool_endpoint": tool_endpoint
+                "tool_endpoint": tool_endpoint,
+                "log_content": self.log_content,
             }
             
             # Get JWT token from tool manager if available
@@ -91,7 +93,7 @@ class WeatherTool(AbstractTool):
                 
                 if not tool_response.success or tool_response.tool_output is None:
                     detail = tool_response.error_message
-                    logger.error(f"Weather tool failed: {detail}")
+                    logger.error(f"Weather tool failed: {logged(detail, self.log_content, label='error body')}")
                     fail(f"Weather is unavailable" + (f": {detail}" if detail else "."))
                 
                 return tool_response.tool_output
@@ -99,7 +101,7 @@ class WeatherTool(AbstractTool):
             except ToolException:
                 raise
             except Exception as e:
-                logger.error(f"Weather tool error ({type(e).__name__}): {e}")
+                logger.error(f"Weather tool error: {describe_error(e, log_content=self.log_content)}")
                 fail(f"Weather is unavailable (error: {type(e).__name__}: {e})")
         
         return reports_failures(weather_tool)

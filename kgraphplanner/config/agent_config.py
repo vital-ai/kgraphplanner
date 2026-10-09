@@ -92,6 +92,11 @@ class ToolConfig:
     enabled: List[str] = field(default_factory=list)
     web_search: Dict[str, Any] = field(default_factory=dict)
     tool_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Log request content (queries, sources, service error bodies, raw
+    # responses) and full exception text from tools. Off by default: tool logs
+    # then carry only tool names, lengths, status codes and error classes.
+    # What a tool returns to the model is not affected.
+    log_content: bool = False
 
     def config_for(self, tool_name: str) -> Dict[str, Any]:
         """Per-tool settings for ``tool_name``, or an empty dict.
@@ -209,7 +214,7 @@ class AgentConfig:
         # Anything else under `tools` that is a dict and is not one of the
         # reserved keys is also treated as a per-tool block, so a config can
         # write `tools: {weather_tool: {...}}` directly.
-        reserved = {"endpoint", "enabled", "web_search", "tool_configs"}
+        reserved = {"endpoint", "enabled", "web_search", "tool_configs", "log_content"}
         tool_configs: Dict[str, Dict[str, Any]] = {
             name: dict(block)
             for name, block in tools_data.items()
@@ -226,6 +231,7 @@ class AgentConfig:
             enabled=tools_data.get("enabled", []),
             web_search=tools_data.get("web_search", {}),
             tool_configs=tool_configs,
+            log_content=bool(tools_data.get("log_content", False)),
         )
 
         model_data = data.get("agent", {}).get("model", {})
@@ -297,11 +303,12 @@ class AgentConfig:
             "enabled": list(self.tools.enabled),
             "web_search": dict(self.tools.web_search),
             "tool_configs": {k: dict(v) for k, v in self.tools.tool_configs.items()},
+            "log_content": self.tools.log_content,
         }
 
     def get_config_for_tool(self, tool_name: str) -> Dict[str, Any]:
         """Config to hand a tool's constructor: shared settings plus its own block."""
-        config = {"tool_endpoint": self.tools.endpoint}
+        config = {"tool_endpoint": self.tools.endpoint, "log_content": self.tools.log_content}
         config.update(self.tools.config_for(tool_name))
         return config
 

@@ -49,7 +49,8 @@ from langgraph.errors import GraphBubbleUp
 
 from kgraphplanner.graph.exec_graph import RetrySpec, WorkerNodeSpec
 from kgraphplanner.worker.llm_usage import failed_attempt_usage, usage_state_update
-from kgraphplanner.worker.worker_errors import WorkerError, WorkerTimeoutError, error_type_of
+from kgraphplanner.worker.error_info import failure_kinds
+from kgraphplanner.worker.worker_errors import WorkerTimeoutError, error_type_of
 
 logger = logging.getLogger(__name__)
 
@@ -87,57 +88,8 @@ def time_left(state: Dict[str, Any], *, include_grace: bool = False) -> Optional
 # Retry classification
 # ---------------------------------------------------------------------------
 
-def _chain(exc: BaseException):
-    """Yield exc and the exceptions it wraps (WorkerError.cause, __cause__)."""
-    seen = set()
-    cur: Optional[BaseException] = exc
-    while cur is not None and id(cur) not in seen:
-        seen.add(id(cur))
-        yield cur
-        nxt = getattr(cur, "cause", None)
-        cur = nxt if isinstance(nxt, BaseException) else cur.__cause__
-
-
-def _class_names(exc: BaseException) -> set:
-    return {c.__name__ for c in type(exc).__mro__}
-
-
-def _status_code(exc: BaseException) -> Optional[int]:
-    code = getattr(exc, "status_code", None)
-    if isinstance(code, int):
-        return code
-    response = getattr(exc, "response", None)
-    code = getattr(response, "status_code", None)
-    return code if isinstance(code, int) else None
-
-
-def failure_kinds(exc: BaseException) -> set:
-    """Classify an exception into the RetrySpec.retry_on vocabulary.
-
-    Duck-typed on class names and status codes so it covers the OpenAI and
-    Anthropic SDKs and httpx without importing them.
-    """
-    kinds = set()
-    for e in _chain(exc):
-        names = _class_names(e)
-        if isinstance(e, WorkerError):
-            kinds.add(e.error_type)
-        if isinstance(e, (WorkerTimeoutError, asyncio.TimeoutError)) or "APITimeoutError" in names:
-            kinds.add("timeout")
-        code = _status_code(e)
-        if code == 429 or "RateLimitError" in names:
-            kinds.add("rate_limit")
-        elif code is not None and code >= 500:
-            kinds.add("server_error")
-        elif code in (401, 403) or names & {"AuthenticationError", "PermissionDeniedError"}:
-            kinds.add("auth_error")
-        elif code is not None and 400 <= code < 500:
-            kinds.add("client_error")
-        if names & {"APIConnectionError", "ConnectError", "ConnectTimeout",
-                    "ReadError", "RemoteProtocolError", "TransportError"} \
-                or isinstance(e, ConnectionError):
-            kinds.add("connection")
-    return kinds
+# Failure classification (failure_kinds) lives in worker/error_info.py so
+# workers can describe errors without importing the runtime.
 
 
 def is_retryable(exc: BaseException, retry_on: Sequence[str]) -> bool:

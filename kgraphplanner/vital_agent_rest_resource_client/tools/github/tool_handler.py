@@ -18,6 +18,7 @@ from typing import Dict, Type
 from pydantic import BaseModel
 
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_handler import ToolHandler
+from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_parameters import ToolParameters
 from kgraphplanner.vital_agent_rest_resource_client.tools.github.issue_models import (
     GitHubIssueToolOutput
@@ -53,7 +54,8 @@ class GitHubToolHandler(ToolHandler):
             # The tool itself raised server-side. Distinct from api_error, which
             # is an expected GitHub/config failure the agent can act on.
             message = response_json.get('error_message') or 'tool execution failed'
-            logger.warning(f"{self.TOOL_NAME} reported failure: {message}")
+            # The message reaches the model; the log carries no content.
+            logger.warning(f"{self.TOOL_NAME} reported failure ({len(str(message))} chars)")
             return self.OUTPUT_MODEL(
                 operation=operation,
                 api_error=f"Tool execution failed on the service: {message}",
@@ -64,7 +66,7 @@ class GitHubToolHandler(ToolHandler):
         except Exception as e:
             # A shape we do not recognise. Surface it rather than returning an
             # empty result that reads as "nothing found".
-            logger.error(f"Could not parse {self.TOOL_NAME} output: {e}")
+            logger.error(f"Could not parse {self.TOOL_NAME} output: {describe_error(e)}")
             return self.OUTPUT_MODEL(
                 operation=operation,
                 api_error=f"Unrecognised response from the tool service: {e}",

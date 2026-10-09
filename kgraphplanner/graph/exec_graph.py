@@ -319,6 +319,49 @@ def create_simple_graph_spec(
         edges=edge_specs
     )
 
+def _validate_start_guards(edges, errors, warnings, allow_expressions: bool) -> None:
+    """Start-edge conditions are guards: each fires independently, so the
+    mixed-routing and missing-default rules for worker sources don't apply."""
+    from kgraphplanner.graph.conditions import parse_condition
+    from kgraphplanner.graph.exec_errors import ConditionSyntaxError
+
+    defaults = []
+    for e in edges:
+        if e.max_traversals is not None or e.on_exhausted is not None:
+            errors.append(GraphValidationError(
+                error_type="invalid_option",
+                message=(f"Start edge to '{e.destination}' sets max_traversals/on_exhausted; "
+                         f"start edges don't loop"),
+                edge_source=e.source, edge_destination=e.destination))
+        if e.condition is None:
+            continue
+        try:
+            cond = parse_condition(e.condition, source="start", allow_expressions=allow_expressions)
+        except ConditionSyntaxError as ce:
+            errors.append(GraphValidationError(
+                error_type="invalid_condition", message=str(ce),
+                edge_source=e.source, edge_destination=e.destination))
+            continue
+        if cond.kind == "on_error":
+            errors.append(GraphValidationError(
+                error_type="invalid_condition",
+                message=f"Start edge to '{e.destination}' uses on_error; start has no node to fail",
+                edge_source=e.source, edge_destination=e.destination))
+        if cond.is_default:
+            defaults.append(e)
+    if len(defaults) > 1:
+        errors.append(GraphValidationError(
+            error_type="invalid_edge",
+            message=f"start has {len(defaults)} __default__ edges; at most one is allowed",
+            node_id="start"))
+    if defaults and any(e.condition is None for e in edges):
+        warnings.append(GraphValidationError(
+            error_type="invalid_option",
+            message=("start has a __default__ edge and unconditional edges; the default "
+                     "fires only when no other start edge does, so it can never fire"),
+            node_id="start", severity="warning"))
+
+
 def validate_graph_spec(graph_spec: GraphSpec, *, allow_expressions: bool = True) -> ValidationResult:
     """Validate a graph specification for correctness.
 
@@ -392,6 +435,9 @@ def validate_graph_spec(graph_spec: GraphSpec, *, allow_expressions: bool = True
         out_edges[edge.source].append(edge)
 
     for source, edges in out_edges.items():
+        if source == "start":
+            _validate_start_guards(edges, errors, warnings, allow_expressions)
+            continue
         conditional = [e for e in edges if e.condition is not None]
         if not conditional:
             for e in edges:

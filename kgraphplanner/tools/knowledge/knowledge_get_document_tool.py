@@ -9,6 +9,7 @@ from langchain_core.tools import tool, ToolException
 from kgraphplanner.tools.tool_errors import fail, reports_failures
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import describe_error, logged
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,8 @@ class KnowledgeGetDocumentTool(AbstractTool):
             Returns:
                 JSON string with document(s) including full text and metadata.
             """
-            logger.info(f"knowledge_get_document_tool: source='{source}' query='{query}' k={k}")
+            logger.info(f"knowledge_get_document_tool: source={logged(source, self.log_content, label='source')} "
+                        f"query={logged(query, self.log_content, label='query')} k={k}")
 
             if not source and not query:
                 fail("Must provide either 'source' or 'query'.")
@@ -118,7 +120,8 @@ class KnowledgeGetDocumentTool(AbstractTool):
                     results = await asyncio.to_thread(_fetch_by_source)
 
                     if not results.objects:
-                        logger.info(f"knowledge_get_document_tool: no document found for source='{source}'")
+                        logger.info(f"knowledge_get_document_tool: no document found for source "
+                                    f"{logged(source, self.log_content, label='source')}")
                         return json.dumps({"results": [], "count": 0, "mode": "source_lookup",
                                            "error": f"No document found with source='{source}'"})
 
@@ -136,7 +139,8 @@ class KnowledgeGetDocumentTool(AbstractTool):
                     results = await asyncio.to_thread(_bm25_search)
 
                     if not results.objects:
-                        logger.info(f"knowledge_get_document_tool: no results for query='{query}'")
+                        logger.info(f"knowledge_get_document_tool: no results for query "
+                                    f"{logged(query, self.log_content, label='query')}")
                         return json.dumps({"results": [], "count": 0, "mode": "keyword_search"})
 
                     docs_out = [self._format_obj(obj) for obj in results.objects]
@@ -148,7 +152,7 @@ class KnowledgeGetDocumentTool(AbstractTool):
             except ToolException:
                 raise
             except Exception as e:
-                logger.error(f"knowledge_get_document_tool error ({type(e).__name__}): {e}")
+                logger.error(f"knowledge_get_document_tool error: {describe_error(e, log_content=self.log_content)}")
                 fail(f"Knowledge base lookup is unavailable (error: {type(e).__name__}: {e})")
 
         return reports_failures(knowledge_get_document_tool)

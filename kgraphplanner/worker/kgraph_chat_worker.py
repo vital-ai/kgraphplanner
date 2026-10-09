@@ -14,6 +14,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
 from kgraphplanner.worker.llm_usage import extract_usage, usage_state_update
+from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.worker.worker_errors import WorkerError, WorkerLLMError, WorkerParseError
 
 # Keys the framework owns in results[node]. Parsed JSON never overwrites them.
@@ -162,10 +163,11 @@ class KGraphChatWorker(KGraphWorker):
                         )
             else:
                 # No state messages — fall back to args-based HumanMessage
-                if args and "request" in args:
-                    user_query = args["request"]
-                elif args and any(k in args for k in ("query", "message", "worker_output")):
-                    user_query = args.get("query", args.get("message", args.get("worker_output", "")))
+                # The first non-empty of request, query, message, worker_output
+                # is sent alone; if none is set, the prompt and every arg are.
+                direct = self._first_input(args, ("request", "query", "message", "worker_output"))
+                if direct:
+                    user_query = direct
                 elif prompt or args:
                     # Construct request from prompt + args (same pattern as tool worker)
                     parts = []
@@ -223,7 +225,7 @@ class KGraphChatWorker(KGraphWorker):
                     "worker": self.name,
                     "error_type": type(e).__name__,
                 })
-                raise WorkerLLMError(occurrence_id, f"LLM call failed: {type(e).__name__}: {e}",
+                raise WorkerLLMError(occurrence_id, f"LLM call failed: {describe_error(e, log_content=self.log_content)}",
                                      cause=e) from e
             
 
@@ -465,7 +467,7 @@ class KGraphChatWorker(KGraphWorker):
                 response = await self.llm.ainvoke(draft_messages)
             except Exception as e:
                 raise WorkerLLMError(
-                    occurrence_id, f"LLM call failed drafting a question: {type(e).__name__}: {e}",
+                    occurrence_id, f"LLM call failed drafting a question: {describe_error(e, log_content=self.log_content)}",
                     cause=e) from e
             question = getattr(response, 'content', str(response))
             

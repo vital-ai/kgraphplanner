@@ -13,6 +13,7 @@ from pydantic import BaseModel, ValidationError
 
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
 from kgraphplanner.worker.llm_usage import extract_usage, usage_state_update
+from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.worker.worker_errors import WorkerLLMError, WorkerParseError
 
 logger = logging.getLogger(__name__)
@@ -157,7 +158,7 @@ class KGraphStructuredWorker(KGraphWorker):
             try:
                 out = await structured.ainvoke(messages)
             except Exception as e:
-                raise WorkerLLMError(occurrence_id, f"LLM call failed: {type(e).__name__}: {e}",
+                raise WorkerLLMError(occurrence_id, f"LLM call failed: {describe_error(e, log_content=self.log_content)}",
                                      cause=e) from e
             elapsed_ms = (time.time() - t0) * 1000
 

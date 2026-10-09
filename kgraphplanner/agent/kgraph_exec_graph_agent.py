@@ -128,7 +128,8 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
     def _classify_edge(self, e: EdgeSpec, worker_ids: set) -> Optional[str]:
         """How build_graph wires an edge, or None if it would be dropped."""
         if e.source == "start":
-            return "start" if e.destination in worker_ids and e.condition is None else None
+            # A condition on a start edge is a guard (see build_graph).
+            return "start" if e.destination in worker_ids else None
         if e.source not in worker_ids:
             return None
         if e.condition is not None:
@@ -167,9 +168,7 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
         for e in spec.edges:
             kind = self._classify_edge(e, worker_ids)
             if kind is None:
-                if e.source == "start" and e.condition is not None:
-                    why = "conditions on start edges are not supported"
-                elif e.source not in worker_ids and e.source != "start":
+                if e.source not in worker_ids and e.source != "start":
                     why = f"source '{e.source}' is not a worker node"
                 else:
                     why = f"destination '{e.destination}' is not a worker node or 'end'"
@@ -235,9 +234,15 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             run_input = agent_data.get("run_input") or {}
 
             # Never write into dicts held by state or the caller: copy first.
+            # The StartNodeSpec defaults sit underneath a start the caller
+            # seeded, so seeded keys win and undeclared keys keep their defaults.
+            declared = (copy.deepcopy(start_node.initial_data.get("args", start_node.initial_data))
+                        if start_node is not None else None)
             start = copy.deepcopy(results["start"]) if "start" in results else None
-            if start is None and start_node is not None:
-                start = copy.deepcopy(start_node.initial_data.get("args", start_node.initial_data))
+            if start is None:
+                start = declared
+            elif isinstance(start, dict) and isinstance(declared, dict):
+                start = {**declared, **start}
             start_data = run_input.get("start_data")
             if start_data is not None:
                 start = {**(start if isinstance(start, dict) else {}), **copy.deepcopy(start_data)}
@@ -383,6 +388,27 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
 
             return gather
 
+        def _make_start_guard_gather(edges: List[EdgeSpec], dest_node_id: str, fired_start_edges):
+            """Like a gather, but merges only the start edges whose guards fired."""
+            dest_defaults, reset = _dest_defaults(dest_node_id)
+
+            def start_guard_gather(state: AgentState) -> AgentState:
+                agent_data = state.get("agent_data") or {}
+                results = agent_data.get("results") or {}
+                fired = fired_start_edges(state)
+                act = {"prompt": "", "args": {}} if reset else (agent_data.get("activation") or {}).get(
+                    dest_node_id, {"prompt": "", "args": {}})
+                for edge in edges:
+                    if id(edge) in fired:
+                        act = merge_activation(act, dest_defaults, edge, results)
+                return {"agent_data": {
+                    "activation": {dest_node_id: act},
+                    "trace": append_values([dest_node_id]),
+                    "failed_nodes": {dest_node_id: False},
+                }}
+
+            return start_guard_gather
+
         # --- Classify and group edges ---
         worker_ids = set(entry_for)
         start_edges: List[EdgeSpec] = []
@@ -419,6 +445,15 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
         # Prune redundant start edges: if a destination also has incoming
         # worker edges, the start edge would fire before the upstream worker
         # completes, bypassing the required data flow.
+        #
+        # A condition on a start edge is a *guard*, not routing: each guarded
+        # edge fires on its own when its condition holds, unconditional start
+        # edges always fire, and a __default__ start edge fires only if no
+        # other start edge did. Destinations reached only by unconditional
+        # edges keep static wiring; the others get a start-guard gather node,
+        # activated by one router on __entry__.
+        active_start: List[EdgeSpec] = []
+        guarded: List[Tuple[str, str, List[EdgeSpec]]] = []  # (dest, gather node, edges)
         for dest_id, dest_edges in start_by_dest.items():
             if dest_id in worker_by_dest:
                 logger.info(
@@ -426,6 +461,11 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                     f"already reached via worker edge(s) from "
                     f"{[e.source for e in worker_by_dest[dest_id]]}"
                 )
+                continue
+            active_start.extend(dest_edges)
+            if any(e.condition is not None for e in dest_edges):
+                guard_id = _safe_id("__start_guard__", dest_id)
+                guarded.append((dest_id, guard_id, dest_edges))
                 continue
             if len(dest_edges) == 1:
                 hop_id = _safe_id("__hop__", "start", "to", dest_id)
@@ -437,6 +477,18 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 graph.add_node(gather_id, _make_gather(dest_edges, dest_id))
                 graph.add_edge("__entry__", gather_id)
                 graph.add_edge(gather_id, entry_for[dest_id])
+
+        if guarded:
+            fired_start_edges = self._make_start_guard_evaluator(active_start)
+            for dest_id, guard_id, dest_edges in guarded:
+                graph.add_node(guard_id, _make_start_guard_gather(
+                    dest_edges, dest_id, fired_start_edges))
+                graph.add_edge(guard_id, entry_for[dest_id])
+            graph.add_conditional_edges(
+                "__entry__",
+                self._make_start_router(guarded, fired_start_edges),
+                {guard_id: guard_id for _, guard_id, _ in guarded},
+            )
 
         # --- 2. Auto-connect unreachable workers to entry ---
         if not start_edges:
@@ -545,6 +597,57 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
                 connected_to_end.add(e.source)
 
         return graph
+
+    def _make_start_guard_evaluator(self, start_edges: List[EdgeSpec]):
+        """Returns ``fired(state) -> set of id(edge)`` for the active start edges.
+
+        Guards see ``result`` = the start data (after entry_node built it),
+        ``results`` and ``run``; ``traversals`` is empty at the start.
+        """
+        guards = {
+            id(e): parse_condition(e.condition, source="start",
+                                   allow_expressions=self.allow_expressions)
+            for e in start_edges if e.condition is not None
+        }
+
+        def fired(state: AgentState) -> set:
+            agent_data = state.get("agent_data") or {}
+            results = agent_data.get("results") or {}
+            context = {
+                "result": results.get("start", {}),
+                "results": results,
+                "traversals": {},
+                "run": run_context(state),
+            }
+            out: set = set()
+            defaults = []
+            for e in start_edges:
+                guard = guards.get(id(e))
+                if guard is None:
+                    out.add(id(e))
+                elif guard.is_default:
+                    defaults.append(e)
+                elif evaluate_condition(guard, source="start", context=context):
+                    out.add(id(e))
+            if not out:
+                out.update(id(e) for e in defaults)
+            if not out:
+                raise ExecGraphRoutingError("start", context["result"])
+            return out
+
+        return fired
+
+    @staticmethod
+    def _make_start_router(guarded, fired_start_edges):
+        """Router on __entry__: the start-guard gathers with at least one
+        fired edge. Static start edges run alongside it."""
+        def start_router(state: AgentState) -> List[str]:
+            fired = fired_start_edges(state)
+            chosen = [guard_id for _, guard_id, edges in guarded
+                      if any(id(e) in fired for e in edges)]
+            logger.info(f"Start guards: {len(chosen)}/{len(guarded)} guarded destination(s) fired")
+            return chosen
+        return start_router
 
     @staticmethod
     def _make_loop_guard_hop(src_id: str, src_defs: Dict[str, Any]):

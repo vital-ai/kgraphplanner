@@ -44,7 +44,7 @@ Rules:
    c) Every fan_out branch MUST have bindings to forward the source's output: "bindings": {"input": [{"from_node_tpl": "research_{idx}", "path": "$.result_text"}]}
    d) fan_in uses param+reduce instead of per-edge bindings (this is correct as-is).
 10) Keep it succinct; never emit an already-expanded graph. No duplicates.
-11) Conditional branches use declarative conditions only: "has:<key>", "eq:<key>:<value>", "always", or "on_error". Python expressions are rejected. Give conditionals a default_destination_tpl when no branch may match.
+11) Conditional branches use declarative conditions only: "has:<key>", "eq:<key>:<value>", "always", or "on_error". Python expressions are rejected. Give conditionals a default_destination_tpl when no branch may match. Conditionals cannot originate from "start": use fan_out for parallel starts, or route from a worker (to branch on the request's own inputs, route from a gate worker if one is listed).
 
 Return ONLY a valid ProgramSpec JSON object."""
 
@@ -176,12 +176,7 @@ class KGraphPlannerAgent(KGraphBaseAgent):
             ProgramSpec, method="function_calling"
         )
         
-        available_workers = list(self.worker_registry.keys())
-        
-        sys_msg = SystemMessage(content=(
-            self.system_prompt +
-            f"\n\nAvailable workers: {available_workers}"
-        ))
+        sys_msg = SystemMessage(content=self.system_prompt + "\n\n" + self.workers_prompt())
         
         # Few-shot examples as AIMessages (teaches the LLM the exact JSON shape)
         simple_prompt = HumanMessage(content="Research a topic then summarize the findings.")
@@ -253,6 +248,22 @@ class KGraphPlannerAgent(KGraphBaseAgent):
             f"Last error: {last_error}"
         )
     
+    def workers_prompt(self) -> str:
+        """The planner prompt's worker list.
+
+        Bare names (``Available workers: [...]``), exactly as before, unless a
+        registered worker has a ``description``; then one ``- name:
+        description`` line per worker, so the LLM knows what each one does.
+        """
+        names = list(self.worker_registry.keys())
+        descriptions = {name: (getattr(worker, "description", "") or "").strip()
+                        for name, worker in self.worker_registry.items()}
+        if not any(descriptions.values()):
+            return f"Available workers: {names}"
+        lines = [f"- {name}: {text}" if text else f"- {name}"
+                 for name, text in descriptions.items()]
+        return "Available workers:\n" + "\n".join(lines)
+
     def expand(self, program: ProgramSpec) -> GraphSpec:
         """
         Expand a ProgramSpec into a GraphSpec.

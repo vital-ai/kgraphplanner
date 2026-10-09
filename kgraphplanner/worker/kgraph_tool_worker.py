@@ -18,6 +18,7 @@ from langchain_core.tools import BaseTool
 
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
 from kgraphplanner.worker.llm_usage import extract_usage, sum_usage, usage_state_update
+from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.worker.worker_errors import WorkerError, WorkerLLMError
 
 
@@ -177,7 +178,7 @@ class KGraphToolWorker(KGraphWorker):
                     response = await self.summarization_llm.ainvoke(messages)
                 except Exception as e:
                     raise WorkerLLMError(
-                        occurrence_id, f"final-answer LLM call failed: {type(e).__name__}: {e}",
+                        occurrence_id, f"final-answer LLM call failed: {describe_error(e, log_content=self.log_content)}",
                         cause=e) from e
                 usage = extract_usage(response, latency_ms=(time.time() - _t_sum) * 1000,
                                       llm=self.summarization_llm)
@@ -248,7 +249,7 @@ class KGraphToolWorker(KGraphWorker):
                 except Exception as e:
                     raise WorkerLLMError(
                         occurrence_id,
-                        f"max-iterations summary LLM call failed: {type(e).__name__}: {e}",
+                        f"max-iterations summary LLM call failed: {describe_error(e, log_content=self.log_content)}",
                         cause=e) from e
                 summary_usage = [extract_usage(
                     summary_response, latency_ms=(_t_sum_done - _t_sum) * 1000,
@@ -377,7 +378,7 @@ class KGraphToolWorker(KGraphWorker):
                 response = await llm_with_tools.ainvoke(messages)
                 _t_llm_done = time.time()
             except Exception as e:
-                raise WorkerLLMError(occurrence_id, f"LLM call failed: {type(e).__name__}: {e}",
+                raise WorkerLLMError(occurrence_id, f"LLM call failed: {describe_error(e, log_content=self.log_content)}",
                                      cause=e) from e
 
             _llm_elapsed = _t_llm_done - _t_llm
@@ -549,7 +550,8 @@ class KGraphToolWorker(KGraphWorker):
                                 f"reasoning_tokens={reasoning_tok}"
                             )
                         except Exception as sum_err:
-                            logger.warning(f"Summarization failed for '{tool_name}': {sum_err}")
+                            logger.warning(f"Summarization failed for '{tool_name}': "
+                                           f"{describe_error(sum_err, log_content=self.log_content)}")
                             summary_text = result_text  # fallback: use raw compact data
                     
                     # Store the full summary by tool_call_id, labeled with tool + args
@@ -569,7 +571,10 @@ class KGraphToolWorker(KGraphWorker):
 
                 except Exception as e:
                     error_msg = f"Error executing tool '{tool_name}': {str(e)}"
-                    logger.debug(f"Tool {tool_name} execution failed: {e}")
+                    # error_msg goes to the model (it needs the reason to
+                    # recover); the log follows log_content.
+                    logger.debug(f"Tool {tool_name} execution failed: "
+                                 f"{describe_error(e, log_content=self.log_content)}")
                     return ToolMessage(content=error_msg, tool_call_id=tool_call_id, name=tool_name)
 
             # Launch all tool calls concurrently

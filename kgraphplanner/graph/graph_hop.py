@@ -84,9 +84,13 @@ def apply_reduce(
         base = base if isinstance(base, dict) else {}
         dst_args[param] = {**base, **(value or {})}
     elif reducer == "concat_text":
-        prev = dst_args.get(param, "")
+        # A missing or None side contributes nothing; non-strings (a bound
+        # dict, list or number) are converted rather than raising TypeError.
+        prev = dst_args.get(param)
+        prev = "" if prev is None else str(prev)
+        value = "" if value is None else str(value)
         separator = "\n" if prev else ""
-        dst_args[param] = (prev + separator + (value or "")).strip()
+        dst_args[param] = (prev + separator + value).strip()
     else:
         dst_args[param] = value
     return dst_args
@@ -113,6 +117,11 @@ def resolve_bindings(
         for b in binding_list:
             if b.literal is not None:
                 val = copy.deepcopy(b.literal)  # don't share the spec's object
+            elif b.from_node is not None and b.from_node not in results_by_node:
+                # The source node hasn't run (e.g. a skipped start-guard
+                # branch): leave the param as it is, so a node default or an
+                # earlier binding stands, rather than writing None over it.
+                continue
             else:
                 source_result = results_by_node.get(b.from_node)
                 # Copy: the value lives in graph state (another node's result).
@@ -152,6 +161,21 @@ def merge_activation(
     """
     # Deep copies: the previous activation is graph state and the defaults
     # belong to the spec, which every run shares. Neither may be mutated.
+    try:
+        return _merge_activation(prev, node_defaults, edge, results_by_node)
+    except Exception as e:
+        # A bad binding otherwise surfaces from an anonymous hop node.
+        raise ValueError(
+            f"Could not build inputs for edge '{edge.source}' -> '{edge.destination}' "
+            f"(bindings {sorted(edge.bindings)}): {type(e).__name__}: {e}") from e
+
+
+def _merge_activation(
+    prev: Activation,
+    node_defaults: Dict[str, Any],
+    edge: EdgeSpec,
+    results_by_node: Dict[str, Any]
+) -> Activation:
     out: Activation = {
         "prompt": prev.get("prompt", ""),
         "args": copy.deepcopy(prev.get("args", {}))

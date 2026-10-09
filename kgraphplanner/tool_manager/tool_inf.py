@@ -37,6 +37,15 @@ class AbstractTool(ABC):
         if self.tool_manager:
             self.tool_manager.add_tool(self)
 
+    @property
+    def log_content(self) -> bool:
+        """Whether this tool may log request content and exception text.
+
+        Set by ``ToolConfig.log_content`` (default False); see
+        ``kgraphplanner.tools.tool_logging``.
+        """
+        return bool((self.config or {}).get("log_content", False))
+
     def get_tool_name(self) -> str:
         """Get the name of the tool."""
         return self.name

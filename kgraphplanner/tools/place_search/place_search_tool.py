@@ -18,6 +18,7 @@ from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_cl
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import describe_error, logged
 
 
 class PlaceSearchTool(AbstractTool):
@@ -60,7 +61,8 @@ class PlaceSearchTool(AbstractTool):
             
             # Create client configuration
             client_config = {
-                "tool_endpoint": tool_endpoint
+                "tool_endpoint": tool_endpoint,
+                "log_content": self.log_content,
             }
             
             # Get JWT token from tool manager if available
@@ -77,7 +79,7 @@ class PlaceSearchTool(AbstractTool):
                 
                 if not tool_response.success or tool_response.tool_output is None:
                     detail = tool_response.error_message
-                    logger.error(f"Place search tool failed: {detail}")
+                    logger.error(f"Place search tool failed: {logged(detail, self.log_content, label='error body')}")
                     fail(f"Place search is unavailable"
                          + (f": {detail}" if detail else "."))
                 
@@ -86,7 +88,7 @@ class PlaceSearchTool(AbstractTool):
             except ToolException:
                 raise
             except Exception as e:
-                logger.error(f"Place search tool error ({type(e).__name__}): {e}")
+                logger.error(f"Place search tool error: {describe_error(e, log_content=self.log_content)}")
                 fail(f"Place search is unavailable (error: {type(e).__name__}: {e})")
         
         return reports_failures(place_search_tool)

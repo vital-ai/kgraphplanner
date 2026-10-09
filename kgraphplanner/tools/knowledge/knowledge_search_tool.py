@@ -9,6 +9,7 @@ from langchain_core.tools import tool, ToolException
 from kgraphplanner.tools.tool_errors import fail, reports_failures
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import describe_error, logged
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ class KnowledgeSearchTool(AbstractTool):
             """
             effective_type = search_type or (self._wv_config.search_type if self._wv_config else "similarity")
             logger.info(
-                f"knowledge_search_tool: query='{query}' collection='{collection}' "
+                f"knowledge_search_tool: query={logged(query, self.log_content, label='query')} collection='{collection}' "
                 f"k={k} search_type='{effective_type}'"
             )
 
@@ -210,7 +211,7 @@ class KnowledgeSearchTool(AbstractTool):
                 # A connection or auth failure is not "the KB had no match".
                 # Returning an empty result set here answered merchant
                 # questions from nothing, at warning level, for hours.
-                logger.error(f"knowledge_search_tool error ({type(e).__name__}): {e}")
+                logger.error(f"knowledge_search_tool error: {describe_error(e, log_content=self.log_content)}")
                 fail(f"Knowledge base search is unavailable (error: {type(e).__name__}: {e})")
 
         return reports_failures(knowledge_search_tool)

@@ -29,6 +29,7 @@ from langchain_core.tools import tool
 from kgraphplanner.tools.tool_errors import fail_if_error_payload, reports_failures
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import describe_error
 from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_client import (
     VitalAgentRestResourceClient
 )
@@ -245,19 +246,22 @@ class GitHubServiceTool(AbstractTool):
             return None, "The tool service endpoint is not configured."
 
         jwt_token = self.tool_manager.get_jwt_token() if self.tool_manager else None
-        client = VitalAgentRestResourceClient({"tool_endpoint": endpoint}, jwt_token)
+        client = VitalAgentRestResourceClient(
+            {"tool_endpoint": endpoint, "log_content": self.log_content}, jwt_token)
 
         try:
             response = await client.handle_tool_request(self.SERVICE_TOOL, wire_input)
         except PermissionError as e:
             # The client raises rather than returning on 401/403. Uncaught, this
             # ends the agent turn instead of becoming something it can report.
-            logger.warning(f"{self.TOOL_NAME}: auth failure calling the tool service: {e}")
+            logger.warning(f"{self.TOOL_NAME}: auth failure calling the tool service: "
+                           f"{describe_error(e, log_content=self.log_content)}")
             return None, ("Not authorised to call the tool service -- the session token is "
                           "missing or expired. This is an infrastructure problem, not a "
                           "GitHub one; retrying will not help.")
         except Exception as e:
-            logger.error(f"{self.TOOL_NAME}: tool service call failed: {e}")
+            logger.error(f"{self.TOOL_NAME}: tool service call failed: "
+                         f"{describe_error(e, log_content=self.log_content)}")
             return None, f"The tool service could not be reached: {e}"
 
         if response is None or not response.success:

@@ -11,6 +11,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
 from kgraphplanner.worker.llm_usage import extract_usage, usage_state_update
+from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.worker.worker_errors import WorkerError, WorkerLLMError
 
 logger = logging.getLogger(__name__)
@@ -109,7 +110,8 @@ class KGraphCaseWorker(KGraphWorker):
             messages = self._directive_messages(effective_directive)
             
             # Get the user input to categorize
-            user_input = args.get("query", args.get("message", args.get("input", "")))
+            # The first non-empty of these; raises below if none is.
+            user_input = self._first_input(args, ("query", "message", "input"))
             if not user_input:
                 error_msg = "No input provided for categorization"
                 writer({
@@ -176,7 +178,7 @@ Please categorize this input: "{user_input}" """
                     "worker": self.name,
                     "error_type": type(e).__name__,
                 })
-                raise WorkerLLMError(occurrence_id, f"LLM call failed: {type(e).__name__}: {e}",
+                raise WorkerLLMError(occurrence_id, f"LLM call failed: {describe_error(e, log_content=self.log_content)}",
                                      cause=e) from e
 
             result_text = response.content if hasattr(response, 'content') else str(response)

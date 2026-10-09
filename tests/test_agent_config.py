@@ -14,6 +14,8 @@ from kgraphplanner.tool_manager.tool_manager import ToolManager
 
 
 ENDPOINT = "http://localhost:8008"
+# The shared settings every tool receives (0.2.1 added log_content).
+SHARED = {"tool_endpoint": ENDPOINT, "log_content": False}
 
 
 def _config(**tools):
@@ -25,7 +27,7 @@ class TestPerToolConfig:
     def test_block_under_tool_configs_is_delivered(self):
         c = _config(tool_configs={"github_list_issues": {"repos": ["vital-ai/agent-b"]}})
         assert c.get_config_for_tool("github_list_issues") == {
-            "tool_endpoint": ENDPOINT,
+            **SHARED,
             "repos": ["vital-ai/agent-b"],
         }
 
@@ -33,7 +35,7 @@ class TestPerToolConfig:
         """`tools: {weather_tool: {...}}` works without the tool_configs nesting."""
         c = _config(weather_tool={"units": "metric"})
         assert c.get_config_for_tool("weather_tool") == {
-            "tool_endpoint": ENDPOINT,
+            **SHARED,
             "units": "metric",
         }
 
@@ -44,7 +46,7 @@ class TestPerToolConfig:
 
     def test_tool_without_a_block_gets_only_shared_settings(self):
         c = _config(tool_configs={"other_tool": {"x": 1}})
-        assert c.get_config_for_tool("weather_tool") == {"tool_endpoint": ENDPOINT}
+        assert c.get_config_for_tool("weather_tool") == SHARED
 
     def test_reserved_keys_are_not_treated_as_tool_blocks(self):
         c = _config(enabled=["weather_tool"], web_search={"num_results": 4})
@@ -81,7 +83,7 @@ class TestPerToolConfig:
     def test_defaults_have_no_tool_configs(self):
         assert AgentConfig().tools.tool_configs == {}
         assert AgentConfig().get_config_for_tool("anything") == {
-            "tool_endpoint": ToolConfig.endpoint
+            "tool_endpoint": ToolConfig.endpoint, "log_content": False,
         }
 
 
@@ -97,7 +99,7 @@ class TestWebSearchBlockUnchanged:
     @pytest.mark.parametrize("tool", ["google_web_search_tool", "serper_web_search_tool"])
     def test_web_search_is_not_injected_into_the_search_tools(self, tool):
         c = _config(web_search={"num_results": 4})
-        assert c.get_config_for_tool(tool) == {"tool_endpoint": ENDPOINT}
+        assert c.get_config_for_tool(tool) == SHARED
 
 
 class TestToolManagerDelivery:
@@ -118,7 +120,7 @@ class TestToolManagerDelivery:
         tm = ToolManager(config=_config(enabled=self.ALL_TOOLS, web_search={"num_results": 4}))
         tm.load_tools_from_config()
         for name in self.ALL_TOOLS:
-            assert tm.get_tool(name).config == {"tool_endpoint": ENDPOINT}, name
+            assert tm.get_tool(name).config == SHARED, name
 
     def test_a_tool_with_a_block_receives_it(self):
         tm = ToolManager(config=_config(
@@ -126,9 +128,7 @@ class TestToolManagerDelivery:
             tool_configs={"weather_tool": {"units": "metric"}},
         ))
         tm.load_tools_from_config()
-        assert tm.get_tool("weather_tool").config == {
-            "tool_endpoint": ENDPOINT, "units": "metric",
-        }
+        assert tm.get_tool("weather_tool").config == {**SHARED, "units": "metric"}
 
     def test_unknown_enabled_tool_is_skipped_not_fatal(self):
         tm = ToolManager(config=_config(enabled=["weather_tool", "no_such_tool"]))

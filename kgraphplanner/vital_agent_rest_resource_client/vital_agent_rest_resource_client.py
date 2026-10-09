@@ -3,6 +3,7 @@ import logging
 
 import httpx
 
+from kgraphplanner.tools.tool_logging import logged
 from kgraphplanner.vital_agent_rest_resource_client.tool_service_interface import ToolServiceInterface
 from kgraphplanner.vital_agent_rest_resource_client.tools.place_search.tool_handler import \
     PlaceSearchToolHandler
@@ -26,6 +27,10 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
         self.config = config
         self.jwt_token = jwt_token
         self.logger = logging.getLogger(__name__)
+        # From ToolConfig.log_content via the tool's client_config. Off:
+        # service error bodies and raw responses stay out of the logs. The
+        # error text returned to the caller (and on to the model) is unchanged.
+        self.log_content = bool((config or {}).get("log_content", False))
 
     # Tools
 
@@ -54,7 +59,8 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
         # checked this (tools/github/tool_handler.py); the rest did not.
         if not response_json.get('success', True):
             msg = response_json.get('error_message') or f'{tool_name} reported failure'
-            self.logger.error(f"Tool server reported failure for {tool_name}: {msg}")
+            self.logger.error(f"Tool server reported failure for {tool_name}: "
+                              f"{logged(msg, self.log_content, label='error message')}")
             return ToolResponse.create_error(error_message=msg, duration_ms=0)
 
         if tool_name == "weather_tool":
@@ -122,15 +128,18 @@ class VitalAgentRestResourceClient(ToolServiceInterface):
 
         if response.status_code in (401, 403):
             msg = f"Tool server auth error ({response.status_code}) for {tool_name}: {response.text}"
-            self.logger.error(msg)
+            self.logger.error(f"Tool server auth error ({response.status_code}) for {tool_name}: "
+                              f"{logged(response.text, self.log_content, label='error body')}")
             raise PermissionError(msg)
 
         if response.status_code >= 400:
             msg = f"Tool server error ({response.status_code}) for {tool_name}: {response.text}"
-            self.logger.error(msg)
+            self.logger.error(f"Tool server error ({response.status_code}) for {tool_name}: "
+                              f"{logged(response.text, self.log_content, label='error body')}")
             return ToolResponse.create_error(error_message=msg, duration_ms=0)
 
         response_json = response.json()
-        self.logger.debug(f"Response JSON: {response_json}")
+        if self.log_content:
+            self.logger.debug(f"Response JSON: {response_json}")
 
         return self._parse_tool_response(tool_name, tool_parameters, response_json)

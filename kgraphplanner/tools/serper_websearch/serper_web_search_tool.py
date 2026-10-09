@@ -19,6 +19,7 @@ from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_cl
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import describe_error, logged
 
 
 class SerperWebSearchTool(AbstractTool):
@@ -70,7 +71,8 @@ class SerperWebSearchTool(AbstractTool):
                 fail("No search results available: tool endpoint is not configured.")
 
             client_config = {
-                "tool_endpoint": tool_endpoint
+                "tool_endpoint": tool_endpoint,
+                "log_content": self.log_content,
             }
 
             jwt_token = None
@@ -84,7 +86,8 @@ class SerperWebSearchTool(AbstractTool):
 
                 if tool_response is None or not tool_response.success or tool_response.tool_output is None:
                     detail = getattr(tool_response, "error_message", None) if tool_response else None
-                    logger.error(f"Serper search tool failed for query '{search_query}': {detail}")
+                    logger.error(f"Serper search tool failed for query {logged(search_query, self.log_content, label='query')}: "
+                                 f"{logged(detail, self.log_content, label='error body')}")
                     fail(f"No search results available for query: {search_query}"
                          + (f" (error: {detail})" if detail else ""))
 
@@ -97,7 +100,7 @@ class SerperWebSearchTool(AbstractTool):
 
                 results = getattr(serper_results, 'results', None) or []
                 if not results:
-                    logger.info(f"Serper search returned empty results for query: {search_query}")
+                    logger.info(f"Serper search returned empty results for query {logged(search_query, self.log_content, label='query')}")
                     return f"Search returned no results for query: {search_query}"
 
                 return serper_results
@@ -105,8 +108,9 @@ class SerperWebSearchTool(AbstractTool):
             except ToolException:
                 raise
             except Exception as e:
-                logger.error(f"Serper search tool error ({type(e).__name__}): {e}")
-                logger.error(f"Serper search tool traceback:\n{traceback.format_exc()}")
+                logger.error(f"Serper search tool error: {describe_error(e, log_content=self.log_content)}")
+                if self.log_content:
+                    logger.error(f"Serper search tool traceback:\n{traceback.format_exc()}")
                 fail(f"No search results available for query: {search_query} (error: {type(e).__name__}: {e})")
 
         return reports_failures(serper_web_search_tool)

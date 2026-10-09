@@ -99,6 +99,8 @@ OPENAI_API_KEY=sk-...
 # Tool subsystem
 KGPLAN__TOOLS__ENDPOINT=http://localhost:8008
 KGPLAN__TOOLS__ENABLED=google_web_search_tool,weather_tool
+# Log tool request content (queries, error bodies). Off by default.
+KGPLAN__TOOLS__LOG_CONTENT=false
 
 # Model
 KGPLAN__AGENT__MODEL__NAME=gpt-4o-mini

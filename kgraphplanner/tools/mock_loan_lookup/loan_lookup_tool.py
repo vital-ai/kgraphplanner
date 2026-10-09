@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import logged
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +167,8 @@ class LoanLookupTool(AbstractTool):
             Returns:
                 JSON string with account details or a not-found message.
             """
-            logger.info(f"🔍 loan_lookup_tool: type={identifier_type} value={identifier_value}")
+            logger.info(f"🔍 loan_lookup_tool: type={identifier_type} "
+                        f"value={logged(identifier_value, self.log_content, label='identifier')}")
             result = _lookup(identifier_type, identifier_value)
             logger.info(f"📋 loan_lookup_tool: found={result.get('found')}")
             return json.dumps(result, indent=2)

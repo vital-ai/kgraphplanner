@@ -102,6 +102,8 @@ safe to share across concurrent runs.
 - `start_data` is merged over the start node's `initial_data`, or over
   `initial_data["args"]` when that key exists. Bindings read it with
   `from_node="start"`.
+- A caller that seeds `results["start"]` itself (raw `ainvoke`) keeps the
+  `StartNodeSpec` defaults for keys it leaves out: seeded keys win.
 - `timeout` (seconds) or `deadline` (epoch seconds) sets the **run deadline**.
   `GraphSpec.timeout_seconds` is the default. See
   [Deadlines](#deadlines-and-the-grace-window).
@@ -148,7 +150,8 @@ from an earlier turn. Only `messages` (the conversation) carries over.
 ### Edges
 
 Each edge connects a worker to another worker or to `end`. Edges from `start`
-go to workers and can't have conditions.
+go to workers; a condition on a start edge is a guard (see
+[Start-edge guards](#start-edge-guards)).
 
 A source either has only unconditional out-edges or only conditional ones.
 Mixing them is a build error, because both kinds would fire.
@@ -158,6 +161,47 @@ Two more build rules:
   with a warning. The node waits for its upstream worker instead.
 - With no start edges at all, every worker with no incoming edges is wired to
   the start.
+
+### Start-edge guards
+
+A condition on a **start** edge works differently from one on a worker's
+edges. Worker edges are exclusive routing: the first match wins. Start edges
+are usually a parallel fan-out, so a condition there is a **guard**:
+
+- Each guarded start edge fires on its own when its condition holds.
+- Unconditional start edges always fire.
+- A `__default__` start edge fires only if no other start edge fired.
+- If no start edge fires at all, the run raises `ExecGraphRoutingError`.
+
+Guards see `result` = the start data (after `start_data`, the injected last
+human message and the `StartNodeSpec` defaults are applied), plus `results`
+and `run`. `max_traversals`, `on_exhausted` and `on_error` aren't allowed on
+start edges.
+
+Example: run five classifiers in parallel, but skip the reactive one when a
+run has no inbound message:
+
+```python
+EdgeSpec(source="start", destination="reactive_classifier",
+         condition="has:inbound_message",
+         bindings={"input": [Binding(from_node="start", path="$.inbound_message")]}),
+EdgeSpec(source="start", destination="blocker_classifier", bindings=...),
+# ... the other classifiers, unconditional
+```
+
+**A skipped node writes no result, and a binding from a node that hasn't run
+is skipped,** so it doesn't write `None`. Give the downstream node a default
+for that arg (`WorkerNodeSpec.defaults["args"]`) when it needs an explicit
+"absent" value:
+
+```python
+WorkerNodeSpec(id="event_resolver", worker_name="event_resolver",
+               defaults={"args": {"reactive_result": "no_inbound_message"}})
+```
+
+`KGraphPlannerAgent` doesn't generate start guards: a `ConditionalSpec` from
+`start` is rejected and re-planned. Generated plans route on their inputs with
+a [gate worker](#workers) instead.
 
 ### Conditions
 
@@ -253,6 +297,19 @@ Per node, in `WorkerNodeSpec`:
     one failed branch is recorded, and a fan-in still runs once with the
     other branches' results.
 
+**Error messages carry no provider text.**
+- A `WorkerError`'s message names the exception class, HTTP status, failure
+  category, and the provider's error code and request id when they are
+  identifier-shaped. For example:
+  `LLM call failed: BadRequestError (HTTP 400, client_error, code=context_length_exceeded, request_id=req_123)`.
+- The provider's own text can echo the request, so it's included only with
+  `log_content=True` on the worker.
+- The original exception is always on `.cause`.
+- The same message is what `errors[node]`, `results[node]["error"]` and
+  `RunResult.errors` hold.
+- An exception message is for operators, not end users. Never put `str(e)`
+  in a user-facing reply.
+
 Interrupts (`interrupt()` / `Command(resume=...)`) pass through timeouts,
 retries and `record` unchanged.
 
@@ -293,6 +350,7 @@ response.
 | `KGraphChatWorker` | One LLM call returning text. |
 | `KGraphCaseWorker` | Classify input into one of N cases. |
 | `KGraphToolWorker` | Tool-calling loop. |
+| `presence_gate(name="gate")` | A deterministic gate (`kgraphplanner.worker.gates`): no LLM call. Its result `{"present": {arg: bool}, "inputs": {...}}` says which bound inputs are non-empty, so branch with `has:present.<arg>`. An input is empty if it's `None`, a blank string, or an empty collection; `0` and `False` count as present. |
 
 **`KGraphFunctionWorker(name, fn, allow_reserved_keys=False)`**
 - `fn(args)` or `fn(args, ctx)`, sync or async. It returns the result dict.
@@ -358,14 +416,17 @@ A node's **inputs** are its prompt and args, built when the node is activated:
      last message, formatted as `[<key>]\n<value>` blocks separated by blank
      lines.
 4. **Otherwise,** one user message:
-   - **Only one arg sent:** if `request` is among the args, the user message
-     is just its value. Failing that, it's the first of `query`, `message` or
-     `worker_output` that's present. All other args are **not sent**.
+   - **Only one arg sent:** the user message is just the first **non-empty**
+     of `request`, `query`, `message` and `worker_output`. All other args are
+     **not sent**. A key that's present but empty is skipped.
+   - If none of those is set, the next rule applies, and every arg is sent.
    - **Otherwise:** the prompt, then each arg on its own line. A string is
      written as `<key>: <value>`. A list becomes `<key>:` followed by
      `  [i] <item>` lines. A dict becomes `<key>: <JSON>`.
    - **Truncated:** list items and dicts are cut to 2,000 characters each.
-   - **With no prompt and no args,** the worker raises `WorkerError`.
+   - **With no prompt and no args at all,** the worker raises `WorkerError`.
+     Bound-but-empty args still count as args, so they don't raise, and the
+     model receives the empty values.
 
 **`KGraphStructuredWorker`**, in order:
 1. **System:** the directive, built as for the chat worker.
@@ -382,7 +443,11 @@ A node's **inputs** are its prompt and args, built when the node is activated:
 **`KGraphCaseWorker`**:
 - **System:** the directive.
 - **System:** a categorization prompt listing the cases and quoting the input.
-  The input is the first of `query`, `message` or `input` in the args.
+  The input is the first **non-empty** of `query`, `message` and `input`. If
+  none is non-empty the worker raises `WorkerError`, even when other args are
+  bound. When the input can legitimately be empty, guard the start edge (see
+  [Start-edge guards](#start-edge-guards)), route through a gate, or bind a
+  non-empty placeholder.
 - **System:** `Additional instructions: <prompt>`, if there's a prompt.
 - **User:** `Categorize: <input>`.
 
@@ -445,9 +510,25 @@ By default, request and response content is never logged, at any level, and
 never put in stream events. Logs carry sizes, keys and metadata only. To change
 this, set these on a worker:
 
-- `log_content=True`: log prompts, args and replies.
+- `log_content=True`: log prompts, args and replies, and include provider
+  error text in error messages.
 - `stream_payloads=True`: include content in custom stream events.
 - `record_args=True`: keep a copy of the args as `results[node]["args_used"]`.
+
+**Tools follow the same rule**, with one switch for all of them:
+`ToolConfig.log_content` (`KGPLAN__TOOLS__LOG_CONTENT`, default off).
+- Off, tool logs carry tool names, lengths, status codes and error classes.
+  They don't carry queries, identifiers, service error bodies, raw responses,
+  exception text or tracebacks.
+- What a tool **returns** to the model is unchanged. A failed call's error
+  text still reaches the model, because it needs the reason to recover. That
+  text can include the tool service's error body, so code that logs tool
+  results is logging content.
+
+**Worker descriptions:** `KGraphWorker.description` (optional) is shown to
+`KGraphPlannerAgent`. When any registered worker has one, the planner prompt
+lists `- name: description` lines instead of bare names. `presence_gate`
+comes with a description that tells the planner how to route on it.
 
 ## Testing
 
@@ -518,9 +599,11 @@ These changes alter behaviour that existing specs may rely on:
      "Chat error: ..." text, `selected_case_id="error"`, or an apology answer.
      That includes the tool worker's final-answer and max-iterations summary
      calls.
-   - A chat, case or tool worker that is activated with no inputs (no prompt,
-     args or tool results) raises `WorkerError`, instead of writing nothing or
-     placeholder text.
+   - A chat or tool worker that is activated with no inputs (no prompt, args
+     or tool results) raises `WorkerError`, instead of writing nothing or
+     placeholder text. A case worker is stricter: it raises whenever
+     `query`, `message` and `input` are all empty, even if other args are
+     bound.
    - A worker that was never activated still does nothing, as before. For
      example, `KGraphCaseAgent` wires every candidate worker but activates
      only the selected one.
@@ -590,3 +673,27 @@ These changes alter behaviour that existing specs may rely on:
     now allows N decision calls, then makes one summarization call. Workers
     tuned around the old behaviour may make more calls; halve `max_iters` to
     keep the old limit.
+
+## Changes in 0.2.1
+
+1. **Error messages carry no provider text by default.** `WorkerLLMError`
+   messages, and so `errors[node]` / `RunResult.errors`, name the class,
+   status, category, provider code and request id instead. Set
+   `log_content=True` on the worker for the full text; the original is on
+   `.cause`.
+2. **Tool logs follow `ToolConfig.log_content`** (default off): no queries,
+   identifiers, error bodies, raw responses or tracebacks in tool logs. What
+   tools return to the model is unchanged. Every tool's config now includes
+   `log_content`.
+3. **`concat_text`** no longer raises on a `None` or non-string value, and a
+   binding error names its edge and params.
+4. **A caller-seeded `results["start"]` keeps the `StartNodeSpec` defaults**
+   for keys it omits. They used to be replaced, so omitted keys resolved to
+   `None`.
+5. **Conditions on start edges are guards** (new). A binding from a node that
+   hasn't run is now skipped instead of writing `None`. `KGraphPlannerAgent`
+   rejects a `ConditionalSpec` from `start`.
+6. **`presence_gate`** (new) and optional worker descriptions in the planner
+   prompt.
+7. **Case and chat workers use the first non-empty input key.** An empty
+   `query` used to win over a set `input` / `message`.

@@ -139,13 +139,16 @@ class TestEndRouting:
                 extra_nodes=[AggregatorNodeSpec(id="agg", aggregation_function="f")],
             )
 
-    def test_condition_on_start_edge_fails_at_build(self):
+    async def test_condition_on_start_edge_is_a_guard(self):
+        # Rejected in 0.2.0; a guard since 0.2.1 (see test_exec_graph_021.py).
         spec = GraphSpec(graph_id="t", nodes=[
             StartNodeSpec(), WorkerNodeSpec(id="a", worker_name="a")],
-            edges=[EdgeSpec(source="start", destination="a", condition="always")])
-        with pytest.raises(GraphSpecError, match="start edges"):
-            KGraphExecGraphAgent(name="t", graph_spec=spec, worker_registry={
-                "a": KGraphFunctionWorker(name="a", fn=lambda a: {})})
+            edges=[EdgeSpec(source="start", destination="a", condition="has:go"),
+                   EdgeSpec(source="start", destination="a", condition="__default__"),
+                   EdgeSpec(source="a", destination="end")])
+        agent = KGraphExecGraphAgent(name="t", graph_spec=spec, worker_registry={
+            "a": KGraphFunctionWorker(name="a", fn=lambda a: {})})
+        assert (await agent.run({"go": True})).trace == ["a"]
 
 
 # ---------------------------------------------------------------------------

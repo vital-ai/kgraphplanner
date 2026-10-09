@@ -41,6 +41,9 @@ class KGraphWorker(ABC):
     log_content: bool = False      # log prompts, args and responses (DEBUG/INFO)
     stream_payloads: bool = False  # include content in custom stream events
     record_args: bool = False      # keep a copy of the activation args as results[node]["args_used"]
+    # What this worker does, for KGraphPlannerAgent's prompt. When any
+    # registered worker has one, the planner lists "name: description" lines.
+    description: str = ""
 
     # False for workers that never call an LLM (e.g. KGraphFunctionWorker).
     uses_llm: ClassVar[bool] = True
@@ -139,6 +142,20 @@ class KGraphWorker(ABC):
                 blocks.append(block)
             return [SystemMessage(content=blocks)]
         return [SystemMessage(content="\n\n".join(seg["text"] for seg in segments))]
+
+    @staticmethod
+    def _first_input(args: Dict[str, Any], keys: Tuple[str, ...]) -> Any:
+        """The first of ``keys`` whose value in *args* is non-empty, else "".
+
+        A key that is present but empty (None, "" or whitespace) is skipped,
+        so ``{"query": "", "input": "hi"}`` gives "hi".
+        """
+        for key in keys:
+            value = args.get(key)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            return value
+        return ""
 
     def _is_activated(self, state: Dict[str, Any], occurrence_id: str) -> bool:
         """True if this occurrence has an activation entry.

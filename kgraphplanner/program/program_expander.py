@@ -38,6 +38,19 @@ def validate_program_spec(program: ProgramSpec) -> Tuple[bool, List[str]]:
     if "start" not in node_ids:
         messages.append("ERROR: 'start' node is required")
         return False, messages
+
+    # A ConditionalSpec means exclusive routing ("pick a branch, else the
+    # default"). From start, the exec graph would treat its branches as
+    # independent guards instead, so the same construct would mean something
+    # else. Generated plans route from a worker; start guards are for
+    # hand-written GraphSpecs.
+    for cond in program.conditionals:
+        if cond.source_tpl == "start":
+            messages.append(
+                "ERROR: conditionals cannot originate from 'start'. Use fan_out for "
+                "parallel starts, or route from a worker (start -> classifier or gate "
+                "worker -> conditional branches)")
+            return False, messages
     
     if "end" not in node_ids:
         messages.append("ERROR: 'end' node is required")

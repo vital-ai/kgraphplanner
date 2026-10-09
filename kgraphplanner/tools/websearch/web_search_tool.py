@@ -20,6 +20,7 @@ from kgraphplanner.vital_agent_rest_resource_client.vital_agent_rest_resource_cl
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.tool_manager.tool_inf import AbstractTool
+from kgraphplanner.tools.tool_logging import describe_error, logged
 
 
 class WebSearchTool(AbstractTool):
@@ -88,7 +89,8 @@ class WebSearchTool(AbstractTool):
             
             # Create client configuration
             client_config = {
-                "tool_endpoint": tool_endpoint
+                "tool_endpoint": tool_endpoint,
+                "log_content": self.log_content,
             }
             
             # Get JWT token from tool manager if available
@@ -105,7 +107,8 @@ class WebSearchTool(AbstractTool):
                 
                 if tool_response is None or not tool_response.success or tool_response.tool_output is None:
                     detail = getattr(tool_response, "error_message", None) if tool_response else None
-                    logger.error(f"Web search tool failed for query '{search_query}': {detail}")
+                    logger.error(f"Web search tool failed for query {logged(search_query, self.log_content, label='query')}: "
+                                 f"{logged(detail, self.log_content, label='error body')}")
                     fail(f"No web search results available for query: {search_query}"
                          + (f" (error: {detail})" if detail else ""))
                 
@@ -120,7 +123,7 @@ class WebSearchTool(AbstractTool):
                 
                 results = getattr(web_search_results, 'results', None) or []
                 if not results:
-                    logger.info(f"Web search returned empty results for query: {search_query}")
+                    logger.info(f"Web search returned empty results for query {logged(search_query, self.log_content, label='query')}")
                     return f"Web search returned no results for query: {search_query}"
                 
                 return web_search_results
@@ -128,8 +131,9 @@ class WebSearchTool(AbstractTool):
             except ToolException:
                 raise
             except Exception as e:
-                logger.error(f"Web search tool error ({type(e).__name__}): {e}")
-                logger.error(f"Web search tool traceback:\n{traceback.format_exc()}")
+                logger.error(f"Web search tool error: {describe_error(e, log_content=self.log_content)}")
+                if self.log_content:
+                    logger.error(f"Web search tool traceback:\n{traceback.format_exc()}")
                 fail(f"No web search results available for query: {search_query} (error: {type(e).__name__}: {e})")
         
         return reports_failures(google_web_search_tool)
