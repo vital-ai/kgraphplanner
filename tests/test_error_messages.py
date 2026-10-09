@@ -193,3 +193,79 @@ def test_anthropic_style_body_type_is_used():
     exc.body = {"type": "error", "error": {"type": "overloaded_error", "message": SENTINEL}}
     assert "type=overloaded_error" in describe_error(exc)
     assert SENTINEL not in describe_error(exc)
+
+
+# ---------------------------------------------------------------------------
+# Real SDK exception objects (built offline from httpx responses)
+# ---------------------------------------------------------------------------
+
+import anthropic  # noqa: E402
+import httpx  # noqa: E402
+import openai  # noqa: E402
+
+from kgraphplanner.worker.error_info import failure_kinds  # noqa: E402
+
+_REQUEST = httpx.Request("POST", "https://api.example.test/v1/chat")
+
+
+def _openai(cls, status, code=None, err_type=None):
+    body = {"message": f"echoed: {SENTINEL}", "type": err_type, "code": code}
+    response = httpx.Response(status, request=_REQUEST, headers={"x-request-id": "req_oai123"},
+                              json={"error": body})
+    return cls(f"Error code: {status} - {SENTINEL}", response=response, body=body)
+
+
+def _anthropic(cls, status, err_type):
+    body = {"type": "error", "error": {"type": err_type, "message": f"echoed: {SENTINEL}"}}
+    response = httpx.Response(status, request=_REQUEST, headers={"request-id": "req_ant456"}, json=body)
+    return cls(f"Error code: {status} - {SENTINEL}", response=response, body=body)
+
+
+REAL_ERRORS = [
+    ("openai 400", _openai(openai.BadRequestError, 400, "context_length_exceeded", "invalid_request_error"),
+     ["BadRequestError", "HTTP 400", "client_error", "code=context_length_exceeded",
+      "type=invalid_request_error", "request_id=req_oai123"], {"client_error"}),
+    ("openai 429", _openai(openai.RateLimitError, 429, "rate_limit_exceeded", "requests"),
+     ["RateLimitError", "HTTP 429", "rate_limit", "request_id=req_oai123"], {"rate_limit"}),
+    ("openai 500", _openai(openai.InternalServerError, 500, None, "server_error"),
+     ["InternalServerError", "HTTP 500", "server_error"], {"server_error"}),
+    ("openai connection", openai.APIConnectionError(message=f"Connection error {SENTINEL}", request=_REQUEST),
+     ["APIConnectionError", "connection"], {"connection"}),
+    ("openai timeout", openai.APITimeoutError(request=_REQUEST),
+     # APITimeoutError subclasses APIConnectionError, so it is both.
+     ["APITimeoutError", "timeout"], {"timeout", "connection"}),
+    ("anthropic 400", _anthropic(anthropic.BadRequestError, 400, "invalid_request_error"),
+     ["BadRequestError", "HTTP 400", "client_error", "type=invalid_request_error",
+      "request_id=req_ant456"], {"client_error"}),
+    ("anthropic 429", _anthropic(anthropic.RateLimitError, 429, "rate_limit_error"),
+     ["RateLimitError", "HTTP 429", "rate_limit", "type=rate_limit_error"], {"rate_limit"}),
+    ("anthropic 529", _anthropic(anthropic.InternalServerError, 529, "overloaded_error"),
+     ["HTTP 529", "server_error", "type=overloaded_error", "request_id=req_ant456"], {"server_error"}),
+]
+
+
+@pytest.mark.parametrize("label, exc, facts, kinds", REAL_ERRORS, ids=[r[0] for r in REAL_ERRORS])
+def test_real_sdk_errors_are_described_without_their_text(label, exc, facts, kinds):
+    message = describe_error(exc)
+    assert SENTINEL not in message
+    for fact in facts:
+        assert fact in message, (fact, message)
+    assert failure_kinds(exc) == kinds
+    assert SENTINEL in describe_error(exc, log_content=True) or "Request timed out" in str(exc)
+
+
+async def test_real_sdk_error_through_a_worker():
+    exc = REAL_ERRORS[0][1]
+    agent = single(workers(ScriptedLLM(default=[exc]))["chat"])
+    with pytest.raises(WorkerLLMError) as raised:
+        await agent.run({})
+    assert SENTINEL not in str(raised.value)
+    assert "code=context_length_exceeded" in str(raised.value)
+    assert raised.value.cause is exc
+
+
+async def test_real_rate_limit_is_retried():
+    rate_limited = REAL_ERRORS[1][1]
+    llm = ScriptedLLM(default=[rate_limited, "ok"])
+    agent = single(workers(llm)["chat"], retry=RetrySpec(max_attempts=2, initial_interval=0))
+    assert (await agent.run({})).results["work"]["result_text"] == "ok"

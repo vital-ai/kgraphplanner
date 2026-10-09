@@ -39,6 +39,7 @@ CASES = [
     ("conditional", "test_scripts_planner.cases.case_conditional_routing",    "Conditional Routing"),
     ("research",    "test_scripts_planner.cases.case_planner_tool_research", "Planner + Tool Research (5 companies)"),
     ("diag",        "test_scripts_planner.cases.case_diagnostic_plan_only",  "Diagnostic: Plan Only"),
+    ("gate",        "test_scripts_planner.cases.case_planner_gate",          "Planner routes through a gate worker"),
 ]
 
 
