@@ -188,6 +188,18 @@ on `run.now` or `run.time_left` gives one answer for the whole start step.
 start edges. On an unconditional start edge, `max_traversals` and
 `on_exhausted` are ignored with a build warning, as in 0.2.0.
 
+A start edge, guarded or not, must target a worker node: `start -> end` fails
+the build ("would be dropped"). So when "nothing applies" should end the run
+without doing anything, point the `__default__` start edge at a no-op worker:
+
+```python
+registry["noop"] = KGraphFunctionWorker(name="noop", fn=lambda args: {})
+
+WorkerNodeSpec(id="nothing_to_do", worker_name="noop"),
+EdgeSpec(source="start", destination="nothing_to_do", condition="__default__"),
+EdgeSpec(source="nothing_to_do", destination="end"),
+```
+
 Example: run five classifiers in parallel, but skip the reactive one when a
 run has no inbound message:
 
@@ -696,10 +708,21 @@ These changes alter behaviour that existing specs may rely on:
    identifiers, error bodies, raw responses or tracebacks in tool logs. What
    tools return to the model is unchanged. Every tool's config now includes
    `log_content`.
-3. **Config flags are parsed strictly.** `tools.log_content` and the other
-   boolean settings accept true/false, yes/no, on/off and 1/0 in any case;
-   any other value is a `ValueError`. Before, a string such as `"False"` from
-   `KGPLAN__TOOLS__LOG_CONTENT=False` was truthy and switched logging on.
+3. **Behaviour change: boolean config settings are parsed strictly.** This
+   covers `tools.log_content`, `checkpointing.enabled`, `memory.enabled`,
+   `weaviate.enabled`, `weaviate.http_secure`, `weaviate.grpc_secure` and
+   `weaviate.skip_init_checks`. They accept true/false, yes/no, on/off and
+   1/0 in any case.
+   - Before, any non-empty string other than JSON `false` was truthy, so
+     `KGPLAN__TOOLS__LOG_CONTENT=False` switched content logging on. Values
+     such as `False`, `FALSE`, `no` and `off` now really mean false. Check
+     any deployment that set one of these and relied on the old result. For
+     example, `KGPLAN__WEAVIATE__HTTP_SECURE=False` used to give `True`
+     (TLS); it now gives `False`, which breaks the connection if the server
+     needs TLS.
+   - Any other value (a typo, `"maybe"`) is a `ValueError` at startup,
+     instead of silently counting as true.
+   - Lowercase `true`/`false` and `1`/`0` behave as before.
 4. **Planner errors carry no provider or model text.** A planner LLM error
    is logged, fed back to the model and raised as `describe_error` output. A
    schema error is still fed back in full (the model needs it to repair its
@@ -738,6 +761,9 @@ These changes alter behaviour that existing specs may rely on:
     fields keep their 0.2.0 positional order.
 11. **Case and chat workers use the first non-empty input key,** by the
     presence gate's rule: None, a blank string or an empty collection is
-    skipped; 0 and False count. An empty `query` used to win over a set
-    `input` / `message`. A non-string input a chat worker sends directly is
-    sent as JSON.
+    skipped; 0 and False count.
+    - An empty `query` used to win over a set `input` / `message`.
+    - A non-string input that the chat worker sends on its own (`request`,
+      `query`, `message` or `worker_output`) is now sent as JSON. It used to
+      go through `str()`, so the model saw `{'a': 1}` where it now sees
+      `{"a": 1}`.
