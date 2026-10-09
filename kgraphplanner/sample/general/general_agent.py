@@ -2,12 +2,12 @@
 General Conversational Agent — chat worker ↔ tool worker loop.
 
 A general-purpose conversational agent built with KGraphExecGraphAgent.
-A chat worker (orchestrator) decides whether to use a tool or respond
-directly.  When it needs a tool it emits a JSON message with
-``action = "tool"`` and tool details; this routes to a tool worker that
-executes the request and returns results.  The orchestrator inspects
-the tool result and either requests another tool call or finishes with
-``action = "respond"``.
+A structured worker (orchestrator) decides whether to use a tool or
+respond directly.  It returns an ``OrchestratorDecision``: with
+``action = "tool"`` and a list of tool requests, it routes to a tool
+worker that executes them and returns results.  The orchestrator
+inspects the tool results and either requests more tool calls or
+finishes with ``action = "respond"``.
 
 Flow::
 
@@ -21,16 +21,17 @@ Tools available to the tool worker:
   - place_search_tool       (place / location search)
 
 Workers:
-  - orchestrator      : KGraphChatWorker  (parse_json_response=True)
+  - orchestrator      : KGraphStructuredWorker  (OrchestratorDecision)
   - tool_executor     : KGraphToolWorker  (web search, weather, place search)
   - final_responder   : KGraphChatWorker  (response polish)
 """
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, List, Literal, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from pydantic import BaseModel, Field
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from kgraphplanner.agent.kgraph_exec_graph_agent import KGraphExecGraphAgent
@@ -39,12 +40,39 @@ from kgraphplanner.graph.exec_graph import (
     WorkerNodeSpec, StartNodeSpec, EndNodeSpec,
 )
 from kgraphplanner.worker.kgraph_chat_worker import KGraphChatWorker
+from kgraphplanner.worker.kgraph_structured_worker import KGraphStructuredWorker
 from kgraphplanner.worker.kgraph_tool_worker import KGraphToolWorker
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
 from kgraphplanner.tool_manager.tool_manager import ToolManager
-from vital_agent_kg_utils.vital_agent_rest_resource_client.tools.tool_name_enum import ToolName as ToolNameEnum
 
 from kgraphplanner.sample.general.prompt_loader import load_prompt
+
+
+# ============================================================
+# Orchestrator output
+# ============================================================
+
+ToolId = Literal["google_web_search_tool", "weather_tool", "place_search_tool"]
+TOOL_IDS: List[str] = list(ToolId.__args__)
+
+
+class ToolRequest(BaseModel):
+    tool: ToolId = Field(description="Which tool to call.")
+    query: str = Field(description="What to ask the tool, e.g. a city or a search query.")
+
+
+class OrchestratorDecision(BaseModel):
+    """The orchestrator's decision for one turn."""
+
+    action: Literal["tool", "respond"] = Field(
+        description="'tool' to run tool calls first; 'respond' to answer the user now.")
+    requests: List[ToolRequest] = Field(
+        default_factory=list,
+        description="When action is 'tool': every tool call needed now. They run in parallel.")
+    answer: Optional[str] = Field(
+        None, description="When action is 'respond': the answer to the user.")
+    plan: Optional[str] = Field(
+        None, description="Optional note to self, fed back on the next turn.")
 
 
 # ============================================================
@@ -66,11 +94,12 @@ def build_workers(
     """
     sum_llm = summarization_llm or llm
 
-    orchestrator = KGraphChatWorker(
+    orchestrator = KGraphStructuredWorker(
         name="orchestrator",
         llm=llm,
         system_directive=load_prompt("orchestrator"),
-        parse_json_response=True,
+        schema=OrchestratorDecision,
+        include_conversation=True,
     )
 
     tool_executor = KGraphToolWorker(
@@ -79,11 +108,7 @@ def build_workers(
         summarization_llm=sum_llm,
         system_directive=load_prompt("tool_executor"),
         tool_manager=tool_manager,
-        available_tool_ids=[
-            ToolNameEnum.google_web_search_tool.value,
-            ToolNameEnum.weather_tool.value,
-            ToolNameEnum.place_search_tool.value,
-        ],
+        available_tool_ids=TOOL_IDS,
         max_iters=10,
     )
 
@@ -166,12 +191,12 @@ def build_graph_spec() -> GraphSpec:
         EdgeSpec(
             source="orchestrator",
             destination="tool_executor",
-            condition="result.get('action') == 'tool'",
+            condition="eq:data.action:tool",
             max_traversals=10,
             prompt="Execute the requested tool.",
             bindings={
                 "tool_request": [
-                    Binding(from_node="orchestrator", path="$", transform="text"),
+                    Binding(from_node="orchestrator", path="$.data", transform="json"),
                 ],
             },
         ),
@@ -194,7 +219,7 @@ def build_graph_spec() -> GraphSpec:
                     Binding(from_node="tool_executor", path="$.result_text"),
                 ],
                 "previous_plan": [
-                    Binding(from_node="orchestrator", path="$.plan", transform="text"),
+                    Binding(from_node="orchestrator", path="$.data.plan", transform="text"),
                 ],
             },
         ),
@@ -203,11 +228,27 @@ def build_graph_spec() -> GraphSpec:
         EdgeSpec(
             source="orchestrator",
             destination="final_responder",
-            condition="result.get('action') == 'respond'",
+            condition="eq:data.action:respond",
             bindings={
                 "input": [Binding(from_node="start", path="$.input", transform="text")],
                 "draft_response": [
-                    Binding(from_node="orchestrator", path="$.answer", transform="text"),
+                    Binding(from_node="orchestrator", path="$.data.answer", transform="text"),
+                ],
+            },
+        ),
+
+        # ── orchestrator → final_responder  (fallback) ──
+        # The schema only allows "tool" or "respond", so this is a safety
+        # net: anything else goes to the responder instead of failing the
+        # run with ExecGraphRoutingError.
+        EdgeSpec(
+            source="orchestrator",
+            destination="final_responder",
+            condition="__default__",
+            bindings={
+                "input": [Binding(from_node="start", path="$.input", transform="text")],
+                "draft_response": [
+                    Binding(from_node="orchestrator", path="$.result_text", transform="text"),
                 ],
             },
         ),

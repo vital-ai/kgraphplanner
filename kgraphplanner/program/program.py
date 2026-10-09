@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Dict, List, Any, Optional, Union, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 # ============================================================
 # JSON-Safe Type Definitions
@@ -201,8 +201,20 @@ class ConditionalBranch(BaseModel):
     """A conditional branch with condition and destination."""
     model_config = ConfigDict(extra="forbid")
     
-    condition: str  # Expression or function name
+    condition: str = Field(description=(
+        "Declarative routing condition on the source node's result: "
+        "'has:<key>' (result[key] is truthy), 'eq:<key>:<value>' (result[key] equals value), "
+        "'always', or 'on_error'. Python expressions are not allowed."))
     destination_tpl: str
+
+    @field_validator("condition")
+    @classmethod
+    def _declarative_only(cls, v: str) -> str:
+        # Planner output is LLM-generated, and expression conditions are
+        # eval'ed. Reject them here so plan() re-prompts with the error.
+        from kgraphplanner.graph.conditions import parse_condition
+        parse_condition(v, allow_expressions=False)
+        return v
     prompt_tpl: Optional[str] = None
     bindings: Dict[str, List[BindingPattern]] = Field(default_factory=dict)
 

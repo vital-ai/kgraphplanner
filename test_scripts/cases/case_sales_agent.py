@@ -207,16 +207,16 @@ def bind_for_role(llm: BaseChatModel, role: str) -> BaseChatModel:
 
     ROLE_CAPS = {
         "classify": {
-            "openai":    {"max_tokens": 100,  "reasoning_effort": "low"},
-            "anthropic": {"max_tokens": 30},
+            "openai":    {"max_tokens": 1024, "reasoning_effort": "low"},
+            "anthropic": {"max_tokens": 1024},
         },
         "short": {
-            "openai":    {"max_tokens": 400,  "reasoning_effort": "low"},
-            "anthropic": {"max_tokens": 200},
+            "openai":    {"max_tokens": 4096, "reasoning_effort": "low"},
+            "anthropic": {"max_tokens": 4096},
         },
         "answer": {
-            "openai":    {"max_tokens": 1024, "reasoning_effort": "low"},
-            "anthropic": {"max_tokens": 500},
+            "openai":    {"max_tokens": 16000, "reasoning_effort": "low"},
+            "anthropic": {"max_tokens": 16000},
         },
     }
     caps = ROLE_CAPS.get(role, {})

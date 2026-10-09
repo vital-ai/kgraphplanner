@@ -189,7 +189,8 @@ def _format_defaults(defaults_tpl: Optional[NodeDefaults], context: Dict[str, An
 
 def expand_program_to_graph(
     program: ProgramSpec,
-    start_seed: Optional[Dict[str, Any]] = None
+    start_seed: Optional[Dict[str, Any]] = None,
+    node_defaults: Optional[Dict[str, Any]] = None,
 ) -> GraphSpec:
     """
     Convert a ProgramSpec to a GraphSpec by expanding templates.
@@ -197,10 +198,27 @@ def expand_program_to_graph(
     Args:
         program: The ProgramSpec to expand
         start_seed: Optional additional args to merge into start node args
+        node_defaults: Optional WorkerNodeSpec fields applied to every
+            generated worker node, e.g.
+            ``{"on_error": "record", "timeout_seconds": 30, "retry": {...}}``
         
     Returns:
         Expanded GraphSpec ready for execution
     """
+    graph_spec = _expand_program_to_graph(program, start_seed)
+    if node_defaults:
+        graph_spec = graph_spec.model_copy(update={"nodes": [
+            WorkerNodeSpec.model_validate({**n.model_dump(), **node_defaults})
+            if isinstance(n, WorkerNodeSpec) else n
+            for n in graph_spec.nodes
+        ]})
+    return graph_spec
+
+
+def _expand_program_to_graph(
+    program: ProgramSpec,
+    start_seed: Optional[Dict[str, Any]] = None,
+) -> GraphSpec:
     # Convert static nodes to typed GraphSpec nodes
     nodes = []
     for static_node in program.static_nodes:

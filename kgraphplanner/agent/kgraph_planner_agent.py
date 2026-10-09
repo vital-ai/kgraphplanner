@@ -44,6 +44,7 @@ Rules:
    c) Every fan_out branch MUST have bindings to forward the source's output: "bindings": {"input": [{"from_node_tpl": "research_{idx}", "path": "$.result_text"}]}
    d) fan_in uses param+reduce instead of per-edge bindings (this is correct as-is).
 10) Keep it succinct; never emit an already-expanded graph. No duplicates.
+11) Conditional branches use declarative conditions only: "has:<key>", "eq:<key>:<value>", "always", or "on_error". Python expressions are rejected. Give conditionals a default_destination_tpl when no branch may match.
 
 Return ONLY a valid ProgramSpec JSON object."""
 
@@ -134,13 +135,21 @@ class KGraphPlannerAgent(KGraphBaseAgent):
         worker_registry: Dict[str, KGraphWorker],
         execution_llm: Optional[ChatOpenAI] = None,
         system_prompt: Optional[str] = None,
-        checkpointer: Optional[BaseCheckpointSaver] = None
+        checkpointer: Optional[BaseCheckpointSaver] = None,
+        node_defaults: Optional[Dict[str, Any]] = None,
     ):
+        """
+        Args:
+            node_defaults: WorkerNodeSpec fields applied to every generated
+                worker node, e.g. ``{"on_error": "record", "timeout_seconds": 30}``
+                so one failed worker doesn't fail the whole plan.
+        """
         super().__init__(name=name, checkpointer=checkpointer)
         self.planner_llm = planner_llm
         self.worker_registry = worker_registry
         self.execution_llm = execution_llm or planner_llm
         self.system_prompt = system_prompt or PLANNER_SYSTEM_PROMPT
+        self.node_defaults = dict(node_defaults or {})
     
     async def plan(self, messages: List[BaseMessage], max_retries: int = 2) -> ProgramSpec:
         """
@@ -222,6 +231,14 @@ class KGraphPlannerAgent(KGraphBaseAgent):
             for msg in validation_messages:
                 if msg.startswith("WARNING"):
                     logger.warning(msg)
+
+            # The expanded graph must also build: feed GraphSpecError back.
+            try:
+                self.exec_agent(self.expand(program))
+            except ValueError as e:
+                last_error = str(e)
+                logger.warning(f"Attempt {attempt + 1} graph validation failed: {last_error}")
+                continue
             
             if attempt > 0:
                 logger.info(f"ProgramSpec succeeded on retry {attempt}")
@@ -249,7 +266,7 @@ class KGraphPlannerAgent(KGraphBaseAgent):
         Raises:
             ValueError: If the expanded graph fails validation
         """
-        graph_spec = expand_program_to_graph(program)
+        graph_spec = expand_program_to_graph(program, node_defaults=self.node_defaults)
         
         validation_result = validate_graph_spec(graph_spec)
         if validation_result.has_errors():
@@ -264,6 +281,33 @@ class KGraphPlannerAgent(KGraphBaseAgent):
                     f"{len(graph_spec.edges)} edges")
         return graph_spec
     
+    def exec_agent(self, graph_spec: GraphSpec):
+        """A KGraphExecGraphAgent for a generated spec.
+
+        Expression conditions are disabled: generated specs are LLM output
+        and expressions are eval'ed. Raises GraphSpecError if the spec is
+        invalid.
+        """
+        from kgraphplanner.agent.kgraph_exec_graph_agent import KGraphExecGraphAgent
+
+        return KGraphExecGraphAgent(
+            name=f"{self.name}_exec",
+            graph_spec=graph_spec,
+            worker_registry=self.worker_registry,
+            allow_expressions=False,
+        )
+
+    async def execute(self, graph_spec: GraphSpec, start_data: Optional[Dict[str, Any]] = None,
+                      **run_kwargs):
+        """Run a GraphSpec (e.g. from ``expand(plan(...))``) once, without a
+        checkpointer. Returns a ``RunResult``; ``run_kwargs`` go to
+        ``KGraphExecGraphAgent.run`` (timeout, deadline, grace, ...).
+
+        The user's request isn't injected from messages here: pass it in
+        ``start_data`` (e.g. ``{"input": text}``).
+        """
+        return await self.exec_agent(graph_spec).run(start_data, **run_kwargs)
+
     def _build_exec_graph(self, graph_spec: GraphSpec) -> StateGraph:
         """
         Build a LangGraph StateGraph from GraphSpec using the worker registry.
@@ -271,14 +315,7 @@ class KGraphPlannerAgent(KGraphBaseAgent):
         grouping, gather nodes for fan-in, conditional routing, and parallel
         execution correctly.
         """
-        from kgraphplanner.agent.kgraph_exec_graph_agent import KGraphExecGraphAgent
-        
-        exec_agent = KGraphExecGraphAgent(
-            name=f"{self.name}_exec",
-            graph_spec=graph_spec,
-            worker_registry=self.worker_registry
-        )
-        return exec_agent.build_graph()
+        return self.exec_agent(graph_spec).build_graph()
     
     def build_graph(self) -> StateGraph:
         """
@@ -339,7 +376,16 @@ class KGraphPlannerAgent(KGraphBaseAgent):
         
         # Step 3: Execute
         logger.info("Step 3: Executing...")
-        exec_graph = self._build_exec_graph(graph_spec)
+        try:
+            exec_graph = self._build_exec_graph(graph_spec)
+        except ValueError as e:  # GraphSpecError
+            logger.error(f"Graph build failed: {e}")
+            return {
+                "messages": messages,
+                "agent_data": {"errors": {"graph_spec": str(e)}, "results": {}},
+                "program_spec": program.model_dump(),
+                "graph_spec": graph_spec.model_dump()
+            }
         compiled = exec_graph.compile(checkpointer=self.checkpointer)
         
         initial_state = {

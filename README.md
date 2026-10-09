@@ -36,7 +36,7 @@ KGraphPlanner provides a layered architecture for constructing AI agent pipeline
 | `KGraphToolAgent` | Agent with OpenAI function-calling and external tools |
 | `KGraphCaseAgent` | Routes requests through LLM-based categorization to specialized workers |
 | `KGraphPlannerAgent` | Classifies user requests via LLM and routes to category-specific handlers (greeting, question, planning, etc.) |
-| `KGraphExecGraphAgent` | Executes a declarative `GraphSpec` using a registry of workers |
+| `KGraphExecGraphAgent` | Executes a declarative `GraphSpec` using a registry of workers (see [docs/exec_graph.md](docs/exec_graph.md)) |
 
 ### Workers
 
@@ -45,6 +45,8 @@ KGraphPlanner provides a layered architecture for constructing AI agent pipeline
 | `KGraphChatWorker` | Single LLM call — responds to a prompt with conversation history |
 | `KGraphToolWorker` | Multi-turn tool-calling loop — decides, calls tools, and finalizes |
 | `KGraphCaseWorker` | Classifies input into one of N categories via structured LLM output |
+| `KGraphStructuredWorker` | Single LLM call returning a validated pydantic model |
+| `KGraphFunctionWorker` | Deterministic Python code as a graph node — no LLM |
 
 ### Tools
 
@@ -203,7 +205,24 @@ agent = KGraphToolAgent(
 )
 ```
 
+### Exec Graph Agent (Fixed Pipelines)
+
+Wire workers into a declarative graph with bindings, conditional routing,
+bounded loops, per-node timeouts and retries, and a run deadline. See
+[docs/exec_graph.md](docs/exec_graph.md) for a complete example, the routing
+rules, and the v0.2.0 migration notes.
+
+```python
+agent = KGraphExecGraphAgent(name="explain", graph_spec=spec, worker_registry=workers)
+result = await agent.run({"case": case_data}, timeout=40)
+result.results, result.errors, result.usage
+```
+
 ## Testing
+
+The offline pytest suite runs with `pytest` from the repo root.
+`kgraphplanner.testing` provides `ScriptedLLM` (a fake chat model scripted per
+graph node, with structured-output support) and `assert_node_order`.
 
 Tests are organized into modular cases run by dedicated runners:
 
@@ -249,7 +268,10 @@ kgraphplanner/
 │   ├── kgraph_worker.py          # Abstract base worker
 │   ├── kgraph_chat_worker.py     # Chat (single LLM call)
 │   ├── kgraph_tool_worker.py     # Tool-calling loop
-│   └── kgraph_case_worker.py     # Categorization
+│   ├── kgraph_case_worker.py     # Categorization
+│   ├── kgraph_structured_worker.py # Pydantic structured output
+│   ├── kgraph_function_worker.py # Deterministic code node
+│   └── worker_errors.py          # Typed worker failures
 ├── config/             # Configuration
 │   └── agent_config.py           # Typed config with from_yaml/from_dict/from_env
 ├── tool_manager/       # Tool management
@@ -257,6 +279,7 @@ kgraphplanner/
 ├── tools/              # Built-in tool implementations
 ├── graph/              # Execution graph models
 │   ├── exec_graph.py             # GraphSpec, EdgeSpec, Binding models
+│   ├── conditions.py             # Routing condition parser/evaluator
 │   └── graph_hop.py              # Activation merging utilities
 ├── program/            # Program specification
 │   ├── program.py                # ProgramSpec models

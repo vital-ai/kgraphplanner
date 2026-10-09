@@ -17,6 +17,8 @@ from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AI
 from langchain_core.tools import BaseTool
 
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
+from kgraphplanner.worker.llm_usage import extract_usage, sum_usage, usage_state_update
+from kgraphplanner.worker.worker_errors import WorkerError, WorkerLLMError
 
 
 @dataclass
@@ -100,10 +102,11 @@ class KGraphToolWorker(KGraphWorker):
             args = activation.get("args", {})
             
             logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' decision_node START")
-            logger.debug(f"Tool worker '{occurrence_id}' checking activation: {activation}")
+            if self.log_content:
+                logger.debug(f"Tool worker '{occurrence_id}' checking activation: {activation}")
             
             # Resolve directive early: args may override/append via bindings.
-            effective_directive = self._resolve_system_directive(args)
+            effective_directive, args = self._split_directive(args)
             
             # Check if we have activation data or tool results to work with
             slot = self._get_worker_slot(state, occurrence_id)
@@ -123,6 +126,7 @@ class KGraphToolWorker(KGraphWorker):
                 slot["iters"] = 0
                 slot["tool_history"] = []
                 slot["_summaries"] = {}
+                slot["_usage"] = []
                 slot.pop("pending_ai_message", None)
                 slot["_activation_key"] = activation_key
             
@@ -131,85 +135,80 @@ class KGraphToolWorker(KGraphWorker):
             has_tool_results = len(tool_history) > 0
             
             if not prompt and not args and not has_tool_results:
-                logger.debug(f"Tool worker '{occurrence_id}' has no activation or tool results, creating final decision")
-                # Create a final decision to terminate the worker
+                if not self._is_activated(state, occurrence_id):
+                    # Not selected (e.g. a KGraphCaseAgent candidate): finish
+                    # without an LLM call, as before.
+                    slot["last_decision"] = {
+                        "type": "final",
+                        "tool_name": None,
+                        "arguments": {},
+                        "tool_call_id": None,
+                        "answer": "No activation data provided"
+                    }
+                    return {"work": {occurrence_id: slot}}
+                # Activated with nothing to work on: finishing with
+                # placeholder text would look like an answer.
+                raise WorkerError(occurrence_id, "no prompt, args or tool results to act on")
+            
+            # If no activation but we have tool results, generate final answer from results
+            if not prompt and not args and has_tool_results:
+                logger.debug(f"Tool worker '{occurrence_id}' has no activation but has tool results, generating final answer")
+                
+                # Build messages for final answer generation. System messages
+                # come first (Anthropic rejects them mid-conversation), and the
+                # tool results go in as text: this call binds no tools.
+                messages = self._directive_messages(effective_directive)
+                messages.append(SystemMessage(content=(
+                    "Based on the tool results provided, give a comprehensive final "
+                    "answer to the user's question.")))
+                
+                # Add the original user request from state messages
+                for msg in state.get("messages", []):
+                    if msg.__class__.__name__ == 'HumanMessage':
+                        messages.append(msg)
+                        break
+                
+                messages.append(HumanMessage(content=self._tool_results_text(tool_history)))
+                
+                logger.debug(f"Generating final answer with {len(messages)} messages")
+                
+                try:
+                    _t_sum = time.time()
+                    response = await self.summarization_llm.ainvoke(messages)
+                except Exception as e:
+                    raise WorkerLLMError(
+                        occurrence_id, f"final-answer LLM call failed: {type(e).__name__}: {e}",
+                        cause=e) from e
+                usage = extract_usage(response, latency_ms=(time.time() - _t_sum) * 1000,
+                                      llm=self.summarization_llm)
+                slot.setdefault("_usage", []).append(usage)
+                final_answer = response.content if hasattr(response, 'content') else str(response)
+                
+                if self.log_content:
+                    logger.debug(f"Generated final answer: {final_answer}")
+                
                 slot["last_decision"] = {
                     "type": "final",
                     "tool_name": None,
                     "arguments": {},
                     "tool_call_id": None,
-                    "answer": "No activation data provided"
+                    "answer": final_answer
                 }
-                return {"work": {occurrence_id: slot}}
+                return {
+                    "work": {occurrence_id: slot},
+                    "agent_data": {
+                        "decisions": {occurrence_id: slot["last_decision"]},
+                        **usage_state_update(state, occurrence_id, [usage]),
+                    }
+                }
             
-            # If no activation but we have tool results, generate final answer from results
-            if not prompt and not args and has_tool_results:
-                logger.debug(f"Tool worker '{occurrence_id}' has no activation but has tool results, generating final answer")
-                logger.debug(f"Found {len(recent_tool_messages)} recent tool messages")
-                
-                # Build messages for final answer generation
-                messages = []
-                if effective_directive:
-                    messages.append(SystemMessage(content=effective_directive))
-                
-                # Add the original user request from state messages
-                for msg in state_messages:
-                    if hasattr(msg, 'content') and msg.__class__.__name__ == 'HumanMessage':
-                        messages.append(msg)
-                        break
-                
-                # Add recent tool results
-                for tool_msg in reversed(recent_tool_messages):
-                    messages.append(SystemMessage(content=f"Tool result: {tool_msg.content}"))
-                
-                messages.append(SystemMessage(content="Based on the tool results above, provide a comprehensive final answer to the user's question."))
-                
-                logger.debug(f"Generating final answer with {len(messages)} messages")
-                
-                # Call summarization LLM to generate final answer
-                try:
-                    response = await self.summarization_llm.ainvoke(messages)
-                    final_answer = response.content if hasattr(response, 'content') else str(response)
-                    
-                    logger.debug(f"Generated final answer: {final_answer}")
-                    
-                    slot["last_decision"] = {
-                        "type": "final",
-                        "tool_name": None,
-                        "arguments": {},
-                        "tool_call_id": None,
-                        "answer": final_answer
-                    }
-                    
-                    # Store the final decision in agent_data.decisions for resolve worker to access
-                    agent_data = dict(state.get("agent_data", {}))
-                    decisions = dict(agent_data.get("decisions", {}))
-                    decisions[occurrence_id] = slot["last_decision"]
-                    agent_data["decisions"] = decisions
-                    
-                    logger.debug(f"Stored final decision in agent_data.decisions[{occurrence_id}]")
-                    
-                    return {
-                        "work": {occurrence_id: slot},
-                        "agent_data": {"decisions": {occurrence_id: slot["last_decision"]}}
-                    }
-                except Exception as e:
-                    logger.debug(f"Error generating final answer: {e}")
-                    slot["last_decision"] = {
-                        "type": "final",
-                        "tool_name": None,
-                        "arguments": {},
-                        "tool_call_id": None,
-                        "answer": "Error generating final answer from tool results"
-                    }
-                    
-                    return {
-                        "work": {occurrence_id: slot},
-                        "agent_data": {"decisions": {occurrence_id: slot["last_decision"]}}
-                    }
-            
-            # Get worker slot and check iteration limit
-            slot = self._get_worker_slot(state, occurrence_id)
+            # Check iteration limit. Keep using the slot from above: a
+            # re-fetch returns a fresh dict on the first activation and
+            # loses _activation_key, so the next decision wiped the tool
+            # history and summaries and re-ran the tools.
+            # iters counts decision calls: the Nth decision runs with
+            # iters == N, so max_iters decisions are allowed before the
+            # final summarization call.
             slot["iters"] += 1
             
             if slot["iters"] > self.max_iters:
@@ -217,14 +216,19 @@ class KGraphToolWorker(KGraphWorker):
                     f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' "
                     f"hit max_iters ({self.max_iters}), making final summarization call"
                 )
-                # Build messages for a final summarization call (no tools)
-                summary_messages = []
-                if effective_directive:
-                    summary_messages.append(SystemMessage(content=effective_directive))
-                prompt = activation.get("prompt", "")
-                args = activation.get("args", {})
+                # Build messages for a final summarization call (no tools).
+                # System messages first, then the request, then the gathered
+                # tool results as text: tool-call messages would need the
+                # tools bound, which this call deliberately doesn't do.
+                summary_messages = self._directive_messages(effective_directive)
                 if prompt:
                     summary_messages.append(SystemMessage(content=f"Task instructions: {prompt}"))
+                summary_messages.append(SystemMessage(
+                    content="You have used all available tool iterations. "
+                            "Do NOT call any more tools. Provide your final, "
+                            "comprehensive answer now using the tool results "
+                            "already gathered."
+                ))
                 if args and "request" in args:
                     summary_messages.append(HumanMessage(content=args["request"]))
                 elif prompt or args:
@@ -234,58 +238,74 @@ class KGraphToolWorker(KGraphWorker):
                     if args:
                         parts.append(f"Context: {json.dumps(args, default=str)}")
                     summary_messages.append(HumanMessage(content="\n".join(parts)))
-                # Include tool history so the LLM can see all gathered data
-                tool_history = slot.get("tool_history", [])
-                for ai_msg, tool_msgs in tool_history:
-                    summary_messages.append(ai_msg)
-                    for tool_msg in tool_msgs:
-                        summary_messages.append(tool_msg)
-                summary_messages.append(SystemMessage(
-                    content="You have used all available tool iterations. "
-                            "Do NOT call any more tools. Provide your final, "
-                            "comprehensive answer now using the information "
-                            "you have already gathered above."
-                ))
+                # Include the gathered tool results so the LLM can use them
+                summary_messages.append(HumanMessage(
+                    content=self._tool_results_text(slot.get("tool_history", []))))
                 try:
                     _t_sum = time.time()
                     summary_response = await self.summarization_llm.ainvoke(summary_messages)
                     _t_sum_done = time.time()
-                    answer = getattr(summary_response, 'content', '') or ''
-                    logger.info(
-                        f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' "
-                        f"max-iter summarization took {_t_sum_done - _t_sum:.1f}s  "
-                        f"content_len={len(answer)}"
-                    )
                 except Exception as e:
-                    logger.warning(f"Tool worker '{occurrence_id}' max-iter summarization failed: {e}")
-                    answer = (
-                        "Maximum iterations reached. Based on the tool results "
-                        "gathered so far, I was unable to produce a final summary."
-                    )
+                    raise WorkerLLMError(
+                        occurrence_id,
+                        f"max-iterations summary LLM call failed: {type(e).__name__}: {e}",
+                        cause=e) from e
+                summary_usage = [extract_usage(
+                    summary_response, latency_ms=(_t_sum_done - _t_sum) * 1000,
+                    llm=self.summarization_llm)]
+                slot.setdefault("_usage", []).extend(summary_usage)
+                answer = getattr(summary_response, 'content', '') or ''
+                logger.info(
+                    f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' "
+                    f"max-iter summarization took {_t_sum_done - _t_sum:.1f}s  "
+                    f"content_len={len(answer)}"
+                )
                 slot["last_decision"] = {"type": "final", "answer": answer}
                 return {
                     "work": {occurrence_id: slot},
                     "agent_data": {
                         "decisions": {occurrence_id: slot["last_decision"]},
-                        "errors": {occurrence_id: f"Max iterations exceeded in {occurrence_id}"}
+                        # Not a failure (there is still an answer), but recorded
+                        # in the same shape as errors so it shows up in run().errors.
+                        "errors": {occurrence_id: {
+                            "type": "max_iterations",
+                            "message": f"Max iterations ({self.max_iters}) exceeded in {occurrence_id}",
+                            "exception": None,
+                            "attempts": 1,
+                        }},
+                        **usage_state_update(state, occurrence_id, summary_usage),
                     }
                 }
             
-            # Build messages for decision
-            messages = []
-            if effective_directive:
-                messages.append(SystemMessage(content=effective_directive))
-            
-            prompt = activation.get("prompt", "")
-            args = activation.get("args", {})
+            # Build messages for decision. All system messages go first:
+            # Anthropic rejects system messages after the conversation starts.
+            messages = self._directive_messages(effective_directive)
             
             if prompt:
                 messages.append(SystemMessage(content=f"Task instructions: {prompt}"))
+            messages.append(SystemMessage(content=f"Available tools: {self.available_tool_ids}"))
+            
+            # Guidance for decision making
+            if slot["iters"] == 1:
+                messages.append(SystemMessage(content="Execute ONLY the tool call(s) specified in the user's request. Do NOT call any tools beyond what was explicitly requested."))
+            elif self.summarize_results:
+                messages.append(SystemMessage(content=(
+                    f"Iteration {slot['iters']}. "
+                    "If all requested tools have returned results, respond with ONLY a JSON object listing the tool_call_ids to include in the final answer, e.g.:\n"
+                    '{"include_summaries": ["call_abc", "call_def"]}\n'
+                    "Do NOT restate or summarize the results yourself. If tools are still pending, make the remaining calls."
+                )))
+            else:
+                messages.append(SystemMessage(content=(
+                    f"Iteration {slot['iters']}. "
+                    "If all requested tools have returned results, compose your final answer using "
+                    "the tool results in this conversation. If tools are still pending, make the remaining calls."
+                )))
             
             # Add the user's request as a human message.
             # Strip orchestrator-internal fields so the tool worker only
             # sees tool-specific data (tool, query, requests).
-            _STRIP_KEYS = {"action", "plan", "result_text", "args_used", "answer", "previous_plan"}
+            _STRIP_KEYS = {"action", "plan", "result_text", "args_used", "answer", "previous_plan", "data", "usage"}
             
             def _clean_tool_args(raw_args: dict) -> dict:
                 cleaned = {}
@@ -305,7 +325,8 @@ class KGraphToolWorker(KGraphWorker):
                     cleaned[k] = v
                 return cleaned
             
-            logger.debug(f"Args received: {args}")
+            if self.log_content:
+                logger.debug(f"Args received: {args}")
             if args and "request" in args:
                 messages.append(HumanMessage(content=args["request"]))
                 logger.debug(f"Added user request from args['request']")
@@ -321,8 +342,6 @@ class KGraphToolWorker(KGraphWorker):
             else:
                 logger.debug("No request, prompt, or args available")
             
-            messages.append(SystemMessage(content=f"Available tools: {self.available_tool_ids}"))
-            
             # Get LangChain tools for binding to LLM
             langchain_tools = []
             for tool_id in self.available_tool_ids:
@@ -330,23 +349,6 @@ class KGraphToolWorker(KGraphWorker):
                 if tool_obj:
                     tool_function = tool_obj.get_tool_function()
                     langchain_tools.append(tool_function)
-            
-            # Add guidance for decision making
-            if slot["iters"] == 1:
-                messages.append(SystemMessage(content="Execute ONLY the tool call(s) specified in the request above. Do NOT call any tools beyond what was explicitly requested."))
-            elif self.summarize_results:
-                messages.append(SystemMessage(content=(
-                    f"Iteration {slot['iters']}. "
-                    "If all requested tools have returned results, respond with ONLY a JSON object listing the tool_call_ids to include in the final answer, e.g.:\n"
-                    '{"include_summaries": ["call_abc", "call_def"]}\n'
-                    "Do NOT restate or summarize the results yourself. If tools are still pending, make the remaining calls."
-                )))
-            else:
-                messages.append(SystemMessage(content=(
-                    f"Iteration {slot['iters']}. "
-                    "If all requested tools have returned results, compose your final answer using "
-                    "the tool results above. If tools are still pending, make the remaining calls."
-                )))
             
             # Add conversation history from THIS worker's own tool_history
             # (isolated per-occurrence to prevent cross-contamination between parallel workers)
@@ -374,70 +376,69 @@ class KGraphToolWorker(KGraphWorker):
                 _t_llm = time.time()
                 response = await llm_with_tools.ainvoke(messages)
                 _t_llm_done = time.time()
-                
-                _llm_elapsed = _t_llm_done - _t_llm
-                raw_content = getattr(response, 'content', None)
-                content_len = len(raw_content) if isinstance(raw_content, str) else 0
-                tool_calls_count = len(response.tool_calls) if hasattr(response, 'tool_calls') and response.tool_calls else 0
+            except Exception as e:
+                raise WorkerLLMError(occurrence_id, f"LLM call failed: {type(e).__name__}: {e}",
+                                     cause=e) from e
 
-                logger.info(
-                    f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' "
-                    f"LLM call took {_llm_elapsed:.1f}s  content_len={content_len}  "
-                    f"tool_calls={tool_calls_count}"
+            _llm_elapsed = _t_llm_done - _t_llm
+            raw_content = getattr(response, 'content', None)
+            content_len = len(raw_content) if isinstance(raw_content, str) else 0
+            tool_calls_count = len(response.tool_calls) if hasattr(response, 'tool_calls') and response.tool_calls else 0
+
+            logger.info(
+                f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' "
+                f"LLM call took {_llm_elapsed:.1f}s  content_len={content_len}  "
+                f"tool_calls={tool_calls_count}"
+            )
+
+            meta = getattr(response, 'response_metadata', {}) or {}
+            usage = meta.get('token_usage') or meta.get('usage', {})
+            ctd = usage.get('completion_tokens_details') or {}
+            reasoning_tok = ctd.get('reasoning_tokens', '?') if isinstance(ctd, dict) else '?'
+            logger.info(
+                f"📊 Tool worker '{occurrence_id}' "
+                f"finish_reason={meta.get('finish_reason', '?')}  "
+                f"model={meta.get('model_name', meta.get('model', '?'))}  "
+                f"prompt_tokens={usage.get('prompt_tokens', '?')}  "
+                f"completion_tokens={usage.get('completion_tokens', '?')}  "
+                f"reasoning_tokens={reasoning_tok}  "
+                f"total_tokens={usage.get('total_tokens', '?')}"
+            )
+
+            if not raw_content and tool_calls_count == 0:
+                logger.warning(
+                    f"⚠️ Tool worker '{occurrence_id}' got empty response with no tool calls "
+                    f"(finish_reason={meta.get('finish_reason', '?')})"
                 )
-
-                meta = getattr(response, 'response_metadata', {}) or {}
-                usage = meta.get('token_usage') or meta.get('usage', {})
-                ctd = usage.get('completion_tokens_details') or {}
-                reasoning_tok = ctd.get('reasoning_tokens', '?') if isinstance(ctd, dict) else '?'
-                logger.info(
-                    f"📊 Tool worker '{occurrence_id}' "
-                    f"finish_reason={meta.get('finish_reason', '?')}  "
-                    f"model={meta.get('model_name', meta.get('model', '?'))}  "
-                    f"prompt_tokens={usage.get('prompt_tokens', '?')}  "
-                    f"completion_tokens={usage.get('completion_tokens', '?')}  "
-                    f"reasoning_tokens={reasoning_tok}  "
-                    f"total_tokens={usage.get('total_tokens', '?')}"
-                )
-
-                if not raw_content and tool_calls_count == 0:
-                    logger.warning(
-                        f"⚠️ Tool worker '{occurrence_id}' got empty response with no tool calls. "
-                        f"raw_content repr: {repr(raw_content)}"
-                    )
+                if self.log_content:
                     for attr in ('content', 'additional_kwargs', 'response_metadata',
                                  'tool_calls', 'invalid_tool_calls', 'usage_metadata'):
                         val = getattr(response, attr, '<missing>')
                         logger.warning(f"  response.{attr} = {repr(val)}")
-                
-                # Process LLM response and determine action
-                decision = self._process_llm_response(response, slot)
-                
-                # Store decision in work slot
-                slot["last_decision"] = decision
-                slot["iters"] = slot.get("iters", 0) + 1
-                
-                # Store AIMessage in worker's own slot (NOT shared state messages)
-                if hasattr(response, 'tool_calls') and response.tool_calls:
-                    logger.debug(f"Storing AIMessage with tool_calls in worker slot")
-                    slot["pending_ai_message"] = response
-                
-                logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' decision_node END ({time.time() - _t0:.1f}s)")
-                
-                # Return partial update — reducers handle merging
-                return {
-                    "work": {occurrence_id: slot},
-                    "agent_data": {"decisions": {occurrence_id: decision}}
+            
+            # Process LLM response and determine action
+            decision = self._process_llm_response(response, slot)
+            
+            # Store decision in work slot
+            slot["last_decision"] = decision
+            
+            # Store AIMessage in worker's own slot (NOT shared state messages)
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                logger.debug(f"Storing AIMessage with tool_calls in worker slot")
+                slot["pending_ai_message"] = response
+            
+            logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' decision_node END ({time.time() - _t0:.1f}s)")
+            
+            # Return partial update — reducers handle merging
+            usage = extract_usage(response, latency_ms=_llm_elapsed * 1000, llm=self.llm)
+            slot.setdefault("_usage", []).append(usage)
+            return {
+                "work": {occurrence_id: slot},
+                "agent_data": {
+                    "decisions": {occurrence_id: decision},
+                    **usage_state_update(state, occurrence_id, [usage]),
                 }
-                
-            except Exception as e:
-                # Force final decision on error
-                slot["last_decision"] = {"type": "final", "answer": "I encountered an error while processing your request, but I'll do my best to help with the information available."}
-                
-                return {
-                    "work": {occurrence_id: slot},
-                    "agent_data": {"errors": {occurrence_id: str(e)}}
-                }
+            }
         
         async def tool_node(state: Dict[str, Any]) -> Dict[str, Any]:
             """Execute all tool calls from the LLM response."""
@@ -461,6 +462,7 @@ class KGraphToolWorker(KGraphWorker):
             
             # Shared dict for per-result summaries (written by _execute_one)
             summaries: Dict[str, str] = {}
+            summary_usages: List[Dict[str, Any]] = []
 
             async def _execute_one(i: int, tool_call: dict) -> ToolMessage:
                 """Execute a single tool call, summarize the result, and return a lightweight ToolMessage."""
@@ -468,7 +470,8 @@ class KGraphToolWorker(KGraphWorker):
                 tool_name = tool_call['name']
                 tool_args = tool_call.get('args', {})
 
-                logger.info(f"🔧 Tool call {i+1}/{n_calls} for '{occurrence_id}': {tool_name} args={tool_args}")
+                logger.info(f"🔧 Tool call {i+1}/{n_calls} for '{occurrence_id}': {tool_name} "
+                            + (f"args={tool_args}" if self.log_content else f"arg_keys={sorted(tool_args)}"))
 
                 # Validate tool exists
                 if tool_name not in self.available_tool_ids:
@@ -486,13 +489,15 @@ class KGraphToolWorker(KGraphWorker):
                     tool_func = tool_obj.get_tool_function()
                     args = self._coerce_tool_args(tool_func, tool_args, activation.get("args", {}))
 
-                    logger.info(f"🔍 [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' query: {args}")
+                    if self.log_content:
+                        logger.info(f"🔍 [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' query: {args}")
                     _t_tool = time.time()
                     result = await tool_func.ainvoke(args)
                     _t_tool_elapsed = time.time() - _t_tool
                     logger.info(
                         f"⏱️ [{time.strftime('%H:%M:%S')}] Tool '{tool_name}' for '{occurrence_id}' "
-                        f"took {_t_tool_elapsed:.1f}s  result:\n{result}"
+                        f"took {_t_tool_elapsed:.1f}s"
+                        + (f"  result:\n{result}" if self.log_content else "")
                     )
 
                     # Convert result to string via compact_dump() when available.
@@ -528,6 +533,9 @@ class KGraphToolWorker(KGraphWorker):
                             sum_resp = await self.summarization_llm.ainvoke(sum_msgs)
                             summary_text = getattr(sum_resp, 'content', '') or ''
                             _sum_elapsed = time.time() - _t_sum
+                            summary_usages.append(extract_usage(
+                                sum_resp, latency_ms=_sum_elapsed * 1000,
+                                llm=self.summarization_llm))
                             
                             meta = getattr(sum_resp, 'response_metadata', {}) or {}
                             usage = meta.get('token_usage') or meta.get('usage', {})
@@ -586,7 +594,12 @@ class KGraphToolWorker(KGraphWorker):
             
             logger.info(f"⏱️ [{time.strftime('%H:%M:%S')}] Tool worker '{occurrence_id}' tool_node END ({time.time() - _t0:.1f}s)")
             # Return partial update
-            return {"work": {occurrence_id: slot}}
+            slot.setdefault("_usage", []).extend(summary_usages)
+            update: Dict[str, Any] = {"work": {occurrence_id: slot}}
+            usage_update = usage_state_update(state, occurrence_id, summary_usages)
+            if usage_update:
+                update["agent_data"] = usage_update
+            return update
         
         def finalize_node(state: Dict[str, Any]) -> Dict[str, Any]:
             """Generate final response and clean up."""
@@ -619,21 +632,24 @@ class KGraphToolWorker(KGraphWorker):
                 f"  FINAL OUTPUT: {occurrence_id}",
                 sep,
             ]
-            for line in rendered.split("\n"):
-                lines.append(f"  {line}")
+            if self.log_content:
+                for line in rendered.split("\n"):
+                    lines.append(f"  {line}")
+            else:
+                lines.append(f"  ({len(rendered)} chars; set log_content=True to log the output)")
             lines.append(sep)
             logger.info("\n".join(lines))
             
+            result: Dict[str, Any] = {"result_text": answer or ""}
+            if slot.get("_usage"):
+                result["usage"] = sum_usage(slot["_usage"])
+            if self.record_args:
+                result["args_used"] = activation.get("args", {})
             # Return partial update — reducers handle merging
             return {
                 "agent_data": {
                     "decisions": {occurrence_id: decision},
-                    "results": {
-                        occurrence_id: {
-                            "result_text": answer or "",
-                            "args_used": activation.get("args", {})
-                        }
-                    }
+                    "results": {occurrence_id: result}
                 }
             }
         
@@ -674,17 +690,21 @@ class KGraphToolWorker(KGraphWorker):
         # adds END edges for nodes listed in GraphSpec.exit_points, matching
         # how KGraphChatWorker and KGraphCaseWorker work.  This allows the
         # tool worker to be used as an intermediate node in a pipeline
-        # (e.g. content_chat ↔ content_tools loop in the CER agent).
+        # (e.g. a chat worker ↔ tool worker loop).
         
         return decision_node_id, finalize_node_id
     
-    def _push_tool_message(self, slot: Dict[str, Any], tool_name: str, result: Any):
-        """Add tool result to conversation history."""
-        messages = slot.get("messages", [])
-        text = json.dumps(result, ensure_ascii=False)
-        messages.append(SystemMessage(content=f"[TOOL {tool_name}] {text}"))
-        slot["messages"] = messages[-6:]  # Keep last 6 messages
-    
+    @staticmethod
+    def _tool_results_text(tool_history) -> str:
+        """The tool results in ``tool_history`` as one text block, for LLM
+        calls that don't bind tools (and so can't take tool-call messages)."""
+        parts = []
+        for _ai_msg, tool_msgs in tool_history:
+            for tool_msg in tool_msgs:
+                name = getattr(tool_msg, "name", None) or "tool"
+                parts.append(f"[{name}]\n{tool_msg.content}")
+        return "Tool results:\n\n" + ("\n\n".join(parts) if parts else "(none)")
+
     def _coerce_tool_args(self, tool: BaseTool, planned: dict, act_args: dict) -> dict:
         """Fill in required args from activation or defaults."""
         args = dict(planned or {})
@@ -724,7 +744,7 @@ class KGraphToolWorker(KGraphWorker):
             arguments = tool_call['args']
             tool_call_id = tool_call['id']
             
-            logger.debug(f"Found tool call - name: {tool_name}, args: {arguments}, id: {tool_call_id}")
+            logger.debug(f"Found tool call - name: {tool_name}, id: {tool_call_id}")
             
             decision = {
                 "type": "tool",
@@ -734,7 +754,8 @@ class KGraphToolWorker(KGraphWorker):
                 "answer": None
             }
             
-            logger.debug(f"Created tool decision: {decision}")
+            if self.log_content:
+                logger.debug(f"Created tool decision: {decision}")
             return decision
         
         # No tool calls - this is a final answer.
@@ -785,5 +806,6 @@ class KGraphToolWorker(KGraphWorker):
             "answer": content
         }
         
-        logger.debug(f"Created final decision: {decision}")
+        if self.log_content:
+            logger.debug(f"Created final decision: {decision}")
         return decision

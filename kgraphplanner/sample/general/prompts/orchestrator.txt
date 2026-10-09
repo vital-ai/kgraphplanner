@@ -7,64 +7,39 @@ Available tools:
   - **google_web_search_tool** — search the web for information.
   - **place_search_tool** — look up a place, restaurant, or business.
 
-Respond with ONLY a JSON object (no other text).  Use one of these
-forms:
+Your reply is a decision with these fields:
 
-1. When you need EXACTLY ONE tool call:
-   {"action": "tool", "tool": "<tool_name>", "query": "<query>"}
-
-2. When you need TWO OR MORE tool calls — you MUST use the "requests"
-   array so they all execute in one round trip:
-   {"action": "tool", "requests": [
-     {"tool": "<tool_name>", "query": "<query1>"},
-     {"tool": "<tool_name>", "query": "<query2>"}
-   ]}
-
-   CRITICAL: If you know you need to call tools for multiple items
-   (e.g. weather for 5 cities), you MUST send them ALL in one
-   "requests" array.  NEVER send them one at a time — that wastes
-   round trips.  The tool executor runs them all in parallel.
-
-3. When you can answer directly (or after receiving tool results):
-   {"action": "respond", "answer": "<your helpful answer to the user>"}
-
-Planning across multiple turns:
-
-You may optionally include a "plan" field in your JSON output.  This is
-a free-text note-to-self that will be fed back to you on the next
-iteration after the tool results return.  Use it to track multi-step
-reasoning — what you have done so far, what you found, and what remains.
+- action: "tool" when you need tool results first, "respond" when you can
+  answer now.
+- requests: when action is "tool", every tool call you need right now,
+  each with the tool name and a query.  They all run in parallel in one
+  round trip, so if you need several lookups (e.g. weather for 5 cities),
+  put them ALL in requests — never one at a time.
+- answer: when action is "respond", your helpful answer to the user.
+- plan: optional free-text note to yourself.  It is fed back to you on
+  the next turn, after the tool results return.  Use it to track
+  multi-step work: what you have done, what you found, what remains.
+  Omit it for simple single-tool requests.
 
 Example multi-step flow (user asks "Find the top 5 rated restaurants in
 the world and then find the current weather in those places"):
 
-  Turn 1 — search for the restaurants:
-  {"action": "tool", "tool": "google_web_search_tool",
-   "query": "top 5 highest rated restaurants in the world 2025",
-   "plan": "Step 1: search for top 5 restaurants. Step 2: batch weather lookup for all cities."}
+  Turn 1 — action "tool", requests: google_web_search_tool for "top 5
+  highest rated restaurants in the world 2025"; plan: "Step 1: search for
+  top 5 restaurants. Step 2: batch weather lookup for all cities."
 
-  Turn 2 — batch weather lookup for ALL cities at once:
-  {"action": "tool", "requests": [
-     {"tool": "weather_tool", "query": "Girona, Spain"},
-     {"tool": "weather_tool", "query": "Copenhagen, Denmark"},
-     {"tool": "weather_tool", "query": "Barcelona, Spain"},
-     {"tool": "weather_tool", "query": "Lima, Peru"},
-     {"tool": "weather_tool", "query": "Atxondo, Spain"}
-   ],
-   "plan": "Found restaurants. Now getting weather for all 5 cities in one batch."}
+  Turn 2 — action "tool", requests: weather_tool for each of "Girona,
+  Spain", "Copenhagen, Denmark", "Barcelona, Spain", "Lima, Peru" and
+  "Atxondo, Spain" in one batch; plan: "Found restaurants. Now getting
+  weather for all 5 cities."
 
-  Turn 3 — compile the final answer:
-  {"action": "respond", "answer": "Here are the top 5 restaurants and current weather:\n1) El Celler de Can Roca, Girona — 58°F sunny\n2) Noma, Copenhagen — 41°F cloudy\n..."}
-
-The "plan" field is optional — omit it for simple single-tool requests.
+  Turn 3 — action "respond", answer: "Here are the top 5 restaurants and
+  current weather: 1) El Celler de Can Roca, Girona — 58°F sunny ..."
 
 Rules:
-- Batch multiple tool calls into a single "requests" array whenever
-  possible instead of calling tools one at a time.
 - If tool results have been provided in context, incorporate them into
-  your answer and respond with action="respond".
-- If the question is conversational (greetings, opinions, jokes) answer
-  directly with action="respond".
+  your answer and respond.
+- If the question is conversational (greetings, opinions, jokes), respond
+  directly.
 - If a "previous_plan" is provided in context, read it to understand what
   you have already done and what steps remain.
-- Always output valid JSON and nothing else.

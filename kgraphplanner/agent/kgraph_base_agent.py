@@ -12,24 +12,78 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from kgraphplanner.agent.kgraph_agent import KGraphAgent
 
 
+REPLACE = "__replace__"
+ADD = "__add__"
+APPEND = "__append__"
+
+
+def replace_value(value: Any) -> Dict[str, Any]:
+    """Wrap an agent_data value so the reducer replaces the key instead of merging.
+
+    Plain dict values are merged one level deep, so writing ``{}`` can never
+    clear a key. Use ``{"activation": replace_value({})}`` to reset it.
+    """
+    return {REPLACE: value}
+
+
+def add_values(value: Dict[str, Any]) -> Dict[str, Any]:
+    """Wrap a nested dict of numbers so the reducer adds it to the current value."""
+    return {ADD: value}
+
+
+def append_values(items: List[Any]) -> Dict[str, Any]:
+    """Wrap a list so the reducer appends it to the current list."""
+    return {APPEND: list(items)}
+
+
+def _op(value: Any) -> Optional[str]:
+    if isinstance(value, dict) and len(value) == 1:
+        key = next(iter(value))
+        if key in (REPLACE, ADD, APPEND):
+            return key
+    return None
+
+
+def _add_nested(base: Any, inc: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(base) if isinstance(base, dict) else {}
+    for k, v in inc.items():
+        if isinstance(v, dict):
+            out[k] = _add_nested(out.get(k), v)
+        elif isinstance(v, (int, float)) and not isinstance(v, bool):
+            prev = out.get(k, 0)
+            out[k] = (prev if isinstance(prev, (int, float)) else 0) + v
+        else:
+            out[k] = v
+    return out
+
+
 def merge_agent_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge agent_data dictionaries, with right values taking precedence."""
-    if not left:
-        return right or {}
+    """Merge agent_data dictionaries, with right values taking precedence.
+
+    Dict values are merged one level deep (``results[node]`` is replaced as a
+    whole). A value wrapped by ``replace_value``, ``add_values`` or
+    ``append_values`` replaces, adds to, or appends to the current value.
+    """
     if not right:
-        return left
-    
-    # Deep merge nested dictionaries
-    result = dict(left)
-    
+        return left or {}
+    result = dict(left or {})
+
     for key, right_value in right.items():
-        if key in result and isinstance(result[key], dict) and isinstance(right_value, dict):
+        op = _op(right_value)
+        if op == REPLACE:
+            result[key] = right_value[REPLACE]
+        elif op == ADD:
+            result[key] = _add_nested(result.get(key), right_value[ADD])
+        elif op == APPEND:
+            prev = result.get(key)
+            result[key] = (list(prev) if isinstance(prev, list) else []) + right_value[APPEND]
+        elif key in result and isinstance(result[key], dict) and isinstance(right_value, dict):
             # Deep merge nested dicts
             result[key] = {**result[key], **right_value}
         else:
             # Direct assignment for non-dict values or new keys
             result[key] = right_value
-    
+
     return result
 
 

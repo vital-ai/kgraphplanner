@@ -114,5 +114,6 @@ python_files = ["test_*.py"]
 addopts = "-q --strict-markers"
 markers = [
     "integration: needs a live external service; deselected by default with -m 'not integration'",
+    "timing: asserts wall-clock bounds; may flake on a loaded runner (skip with -m 'not timing')",
 ]
 asyncio_mode = "auto"

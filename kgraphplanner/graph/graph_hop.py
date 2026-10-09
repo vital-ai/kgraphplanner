@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Dict, List, Any, Optional, TypedDict
 
@@ -69,13 +70,15 @@ def apply_reduce(
         reducer: One of "overwrite", "append_list", "merge_dict", "concat_text", or None (defaults to overwrite)
         
     Returns:
-        The mutated dst_args
+        The mutated dst_args. The existing value under *param* is never
+        mutated: reducers build a new value, because it may be shared with a
+        spec default or an earlier activation.
     """
     if reducer in (None, "overwrite"):
         dst_args[param] = value
     elif reducer == "append_list":
-        dst_args.setdefault(param, [])
-        dst_args[param].append(value)
+        prev = dst_args.get(param)
+        dst_args[param] = (list(prev) if isinstance(prev, list) else []) + [value]
     elif reducer == "merge_dict":
         base = dst_args.get(param, {})
         base = base if isinstance(base, dict) else {}
@@ -109,10 +112,11 @@ def resolve_bindings(
     for param, binding_list in (bindings or {}).items():
         for b in binding_list:
             if b.literal is not None:
-                val = b.literal
+                val = copy.deepcopy(b.literal)  # don't share the spec's object
             else:
                 source_result = results_by_node.get(b.from_node)
-                val = get_by_path(source_result, b.path)
+                # Copy: the value lives in graph state (another node's result).
+                val = copy.deepcopy(get_by_path(source_result, b.path))
             
             if b.transform == "text" and val is not None:
                 val = str(val)
@@ -146,9 +150,11 @@ def merge_activation(
     Returns:
         Merged Activation for the destination node
     """
+    # Deep copies: the previous activation is graph state and the defaults
+    # belong to the spec, which every run shares. Neither may be mutated.
     out: Activation = {
         "prompt": prev.get("prompt", ""),
-        "args": dict(prev.get("args", {}))
+        "args": copy.deepcopy(prev.get("args", {}))
     }
     
     # Apply node defaults (only if not already set)
@@ -157,7 +163,8 @@ def merge_activation(
     if ndp and not out["prompt"]:
         out["prompt"] = ndp
     for k, v in (nd.get("args") or {}).items():
-        out["args"].setdefault(k, v)
+        if k not in out["args"]:
+            out["args"][k] = copy.deepcopy(v)
     
     # Apply edge prompt
     if edge.prompt:
