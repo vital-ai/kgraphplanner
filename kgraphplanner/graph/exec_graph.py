@@ -327,14 +327,23 @@ def _validate_start_guards(edges, errors, warnings, allow_expressions: bool) -> 
 
     defaults = []
     for e in edges:
-        if e.max_traversals is not None or e.on_exhausted is not None:
+        loop_options = e.max_traversals is not None or e.on_exhausted is not None
+        if e.condition is None:
+            # As in 0.2.0: a warning, so specs that built then still build.
+            if loop_options:
+                warnings.append(GraphValidationError(
+                    error_type="invalid_option",
+                    message=(f"Edge '{e.source}' -> '{e.destination}' sets max_traversals/"
+                             f"on_exhausted but has no condition; they only apply to "
+                             f"conditional edges"),
+                    edge_source=e.source, edge_destination=e.destination, severity="warning"))
+            continue
+        if loop_options:
             errors.append(GraphValidationError(
                 error_type="invalid_option",
-                message=(f"Start edge to '{e.destination}' sets max_traversals/on_exhausted; "
-                         f"start edges don't loop"),
+                message=(f"Guarded start edge to '{e.destination}' sets max_traversals/"
+                         f"on_exhausted; start edges don't loop"),
                 edge_source=e.source, edge_destination=e.destination))
-        if e.condition is None:
-            continue
         try:
             cond = parse_condition(e.condition, source="start", allow_expressions=allow_expressions)
         except ConditionSyntaxError as ce:

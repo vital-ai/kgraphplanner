@@ -27,6 +27,23 @@ def _coerce_value(raw: str) -> Any:
     return raw
 
 
+_TRUE = {"true", "1", "yes", "on"}
+_FALSE = {"false", "0", "no", "off", ""}
+
+
+def _as_bool(value: Any, name: str) -> bool:
+    """A config flag as a bool. Strings are matched case-insensitively
+    (true/false, yes/no, on/off, 1/0); anything else is an error, so a typo
+    can't switch a flag on (``bool("False")`` is True)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str) and value.strip().lower() in _TRUE | _FALSE:
+        return value.strip().lower() in _TRUE
+    raise ValueError(f"Config '{name}' must be a boolean, got {value!r}")
+
+
 def _env_to_dict(prefix: str = _DEFAULT_ENV_PREFIX) -> Dict[str, Any]:
     """Parse environment variables with *prefix* into a nested dict.
 
@@ -231,7 +248,7 @@ class AgentConfig:
             enabled=tools_data.get("enabled", []),
             web_search=tools_data.get("web_search", {}),
             tool_configs=tool_configs,
-            log_content=bool(tools_data.get("log_content", False)),
+            log_content=_as_bool(tools_data.get("log_content", False), "tools.log_content"),
         )
 
         model_data = data.get("agent", {}).get("model", {})
@@ -244,7 +261,7 @@ class AgentConfig:
 
         cp_data = data.get("checkpointing", {})
         cp_config = CheckpointConfig(
-            enabled=cp_data.get("enabled", CheckpointConfig.enabled),
+            enabled=_as_bool(cp_data.get("enabled", CheckpointConfig.enabled), "checkpointing.enabled"),
             backend=cp_data.get("backend", CheckpointConfig.backend),
             redis_url=cp_data.get("redis_url", CheckpointConfig.redis_url),
             redis_ttl=int(cp_data.get("redis_ttl", CheckpointConfig.redis_ttl)),
@@ -255,21 +272,21 @@ class AgentConfig:
 
         mem_data = data.get("memory", {})
         mem_config = MemoryConfig(
-            enabled=mem_data.get("enabled", MemoryConfig.enabled),
+            enabled=_as_bool(mem_data.get("enabled", MemoryConfig.enabled), "memory.enabled"),
             max_history=mem_data.get("max_history", MemoryConfig.max_history),
         )
 
         wv_data = data.get("weaviate", {})
         wv_grpc_host = wv_data.get("grpc_host", WeaviateConfig.grpc_host)
         wv_config = WeaviateConfig(
-            enabled=wv_data.get("enabled", WeaviateConfig.enabled),
+            enabled=_as_bool(wv_data.get("enabled", WeaviateConfig.enabled), "weaviate.enabled"),
             http_host=wv_data.get("http_host", WeaviateConfig.http_host),
             http_port=int(wv_data.get("http_port", WeaviateConfig.http_port)),
-            http_secure=wv_data.get("http_secure", WeaviateConfig.http_secure),
+            http_secure=_as_bool(wv_data.get("http_secure", WeaviateConfig.http_secure), "weaviate.http_secure"),
             grpc_host=wv_grpc_host or wv_data.get("http_host", WeaviateConfig.http_host),
             grpc_port=int(wv_data.get("grpc_port", WeaviateConfig.grpc_port)),
-            grpc_secure=wv_data.get("grpc_secure", WeaviateConfig.grpc_secure),
-            skip_init_checks=wv_data.get("skip_init_checks", WeaviateConfig.skip_init_checks),
+            grpc_secure=_as_bool(wv_data.get("grpc_secure", WeaviateConfig.grpc_secure), "weaviate.grpc_secure"),
+            skip_init_checks=_as_bool(wv_data.get("skip_init_checks", WeaviateConfig.skip_init_checks), "weaviate.skip_init_checks"),
             auth_mode=wv_data.get("auth_mode", WeaviateConfig.auth_mode),
             collection_prefix=wv_data.get("collection_prefix", WeaviateConfig.collection_prefix),
             default_collection=wv_data.get("default_collection", WeaviateConfig.default_collection),

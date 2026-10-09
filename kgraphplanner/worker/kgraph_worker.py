@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Tuple, ClassVar, Union
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
@@ -11,6 +11,18 @@ from langchain_core.tools import BaseTool
 from langchain_core.messages import BaseMessage, SystemMessage
 
 DIRECTIVE_KEYS = ("system_directive", "system_directive_append")
+
+
+def is_present(value: Any) -> bool:
+    """False for None, an empty or whitespace-only string, or an empty
+    collection. Anything else is present, including 0 and False."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) > 0
+    return True
 
 # A system directive is a string, or a list of segments for prompt caching:
 #   [{"text": "<stable instructions>", "cache": True}, {"text": "<per-run part>"}]
@@ -43,7 +55,8 @@ class KGraphWorker(ABC):
     record_args: bool = False      # keep a copy of the activation args as results[node]["args_used"]
     # What this worker does, for KGraphPlannerAgent's prompt. When any
     # registered worker has one, the planner lists "name: description" lines.
-    description: str = ""
+    # Keyword-only, so subclass fields keep their 0.2.0 positional order.
+    description: str = field(default="", kw_only=True)
 
     # False for workers that never call an LLM (e.g. KGraphFunctionWorker).
     uses_llm: ClassVar[bool] = True
@@ -147,14 +160,14 @@ class KGraphWorker(ABC):
     def _first_input(args: Dict[str, Any], keys: Tuple[str, ...]) -> Any:
         """The first of ``keys`` whose value in *args* is non-empty, else "".
 
-        A key that is present but empty (None, "" or whitespace) is skipped,
-        so ``{"query": "", "input": "hi"}`` gives "hi".
+        Empty follows ``is_present`` (the presence gate's rule): None, a blank
+        string or an empty collection is skipped, so ``{"query": [], "input":
+        "hi"}`` gives "hi". 0 and False count as present.
         """
         for key in keys:
             value = args.get(key)
-            if value is None or (isinstance(value, str) and not value.strip()):
-                continue
-            return value
+            if is_present(value):
+                return value
         return ""
 
     def _is_activated(self, state: Dict[str, Any], occurrence_id: str) -> bool:

@@ -12,7 +12,7 @@ from langgraph.graph import StateGraph
 from langgraph.runtime import get_runtime
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-from kgraphplanner.worker.kgraph_worker import KGraphWorker
+from kgraphplanner.worker.kgraph_worker import KGraphWorker, is_present
 from kgraphplanner.worker.llm_usage import extract_usage, usage_state_update
 from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.worker.worker_errors import WorkerError, WorkerLLMError, WorkerParseError
@@ -166,8 +166,8 @@ class KGraphChatWorker(KGraphWorker):
                 # The first non-empty of request, query, message, worker_output
                 # is sent alone; if none is set, the prompt and every arg are.
                 direct = self._first_input(args, ("request", "query", "message", "worker_output"))
-                if direct:
-                    user_query = direct
+                if is_present(direct):
+                    user_query = direct if isinstance(direct, str) else json.dumps(direct, default=str)
                 elif prompt or args:
                     # Construct request from prompt + args (same pattern as tool worker)
                     parts = []

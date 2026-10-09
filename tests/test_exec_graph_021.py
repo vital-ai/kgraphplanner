@@ -444,3 +444,127 @@ class TestFirstNonEmptyInput:
         worker = KGraphChatWorker(name="chat", llm=llm, include_conversation=False)
         await one_node(worker, {"query": "", "context": "useful"}).run({})
         assert "context: useful" in llm.calls[0]["messages"][-1].content
+
+
+# ---------------------------------------------------------------------------
+# Pre-release review fixes
+# ---------------------------------------------------------------------------
+
+class TestConfigFlags:
+    @pytest.mark.parametrize("raw,expected", [
+        ("False", False), ("false", False), ("FALSE", False), ("no", False), ("off", False),
+        ("0", False), ("True", True), ("true", True), ("yes", True), ("on", True), ("1", True)])
+    def test_log_content_env_spellings(self, monkeypatch, raw, expected):
+        from kgraphplanner.config.agent_config import AgentConfig
+        monkeypatch.setenv("KGPLAN__TOOLS__LOG_CONTENT", raw)
+        assert AgentConfig.from_env().tools.log_content is expected
+
+    def test_unrecognised_flag_value_is_an_error(self):
+        from kgraphplanner.config.agent_config import AgentConfig
+        with pytest.raises(ValueError, match="tools.log_content"):
+            AgentConfig.from_dict({"tools": {"log_content": "nope"}})
+
+
+class TestStartEdgeLoopOptions:
+    def spec(self, condition):
+        workers = {"a": KGraphFunctionWorker(name="a", fn=lambda a: {})}
+        spec = GraphSpec(graph_id="s", nodes=[StartNodeSpec(), EndNodeSpec(),
+                         WorkerNodeSpec(id="a", worker_name="a")],
+                         edges=[EdgeSpec(source="start", destination="a", condition=condition,
+                                         max_traversals=3),
+                                EdgeSpec(source="a", destination="end")])
+        return KGraphExecGraphAgent(name="s", graph_spec=spec, worker_registry=workers)
+
+    def test_unconditional_start_edge_still_builds_with_a_warning(self):
+        from kgraphplanner.graph.exec_graph import validate_graph_spec
+        agent = self.spec(None)
+        agent.build_graph()
+        report = validate_graph_spec(agent.graph_spec)
+        assert any("no condition" in w.message for w in report.warnings)
+
+    def test_guarded_start_edge_rejects_them(self):
+        with pytest.raises(GraphSpecError, match="start edges don't loop"):
+            self.spec("has:go").build_graph()
+
+
+class TestStartOnReusedThread:
+    async def test_guard_does_not_read_the_previous_runs_start_data(self):
+        from langgraph.checkpoint.memory import InMemorySaver
+        agent = nurture_graph(checkpointer=InMemorySaver())
+        config = {"configurable": {"thread_id": "t1"}}
+        first = await agent.arun(start_data={"inbound_message": "hi"}, config=config)
+        assert "reactive" in first["agent_data"]["trace"]
+        second = await agent.arun(start_data={}, config=config)
+        assert "reactive" not in second["agent_data"]["trace"]
+        assert second["agent_data"]["results"]["start"]["inbound_message"] == ""
+
+    async def test_a_direct_ainvoke_may_still_seed_start(self):
+        agent = nurture_graph()
+        state = await agent.get_compiled_graph().ainvoke(
+            {"messages": [], "agent_data": {"results": {"start": {"inbound_message": "hi"}}}, "work": {}})
+        assert "reactive" in state["agent_data"]["trace"]
+        assert state["agent_data"]["results"]["start"]["lead"] == "L1"  # the declared default
+
+
+class TestPlannerErrorText:
+    SECRET = "SSN-123-45-6789"
+
+    def planner(self, llm):
+        from kgraphplanner.agent.kgraph_planner_agent import KGraphPlannerAgent
+        return KGraphPlannerAgent(name="p", planner_llm=llm, worker_registry={
+            "researcher": KGraphFunctionWorker(name="researcher", fn=lambda a: {})})
+
+    async def test_llm_error_text_stays_out_of_logs_feedback_and_the_error(self, caplog):
+        from langchain_core.messages import HumanMessage
+        llm = ScriptedLLM(default=[RuntimeError(f"echoed {self.SECRET}")] * 2)
+        with caplog.at_level("DEBUG"), pytest.raises(ValueError) as info:
+            await self.planner(llm).plan([HumanMessage(content="x")], max_retries=1)
+        assert self.SECRET not in str(info.value) and "RuntimeError" in str(info.value)
+        assert self.SECRET not in caplog.text
+        assert self.SECRET not in llm.calls[1]["messages"][-1].content
+
+    async def test_schema_error_is_fed_back_but_not_logged(self, caplog):
+        from langchain_core.messages import HumanMessage
+        bad = {"program_id": self.SECRET, "static_nodes": "not a list"}
+        llm = ScriptedLLM(default=[bad, bad])
+        with caplog.at_level("DEBUG"), pytest.raises(ValueError) as info:
+            await self.planner(llm).plan([HumanMessage(content="x")], max_retries=1)
+        assert "static_nodes" in str(info.value)
+        assert self.SECRET not in str(info.value) and "not a list" not in caplog.text
+        # The model still sees the full error, which is how it repairs its output.
+        assert "not a list" in llm.calls[1]["messages"][-1].content
+
+
+class TestPresenceRuleForInputs:
+    async def test_case_worker_skips_an_empty_list(self):
+        llm = ScriptedLLM(default=["a"])
+        worker = KGraphCaseWorker(name="case", llm=llm, cases=[KGCase("a", "A", "a")])
+        result = await one_node(worker, {"query": [], "input": "hello"}).run({})
+        assert result.results["w"]["input"] == "hello"
+
+    async def test_zero_is_present(self):
+        llm = ScriptedLLM(default=["a"])
+        worker = KGraphCaseWorker(name="case", llm=llm, cases=[KGCase("a", "A", "a")])
+        result = await one_node(worker, {"query": 0, "input": "hello"}).run({})
+        assert result.results["w"]["input"] == 0
+
+    async def test_chat_worker_sends_a_non_string_input_as_json(self):
+        llm = ScriptedLLM(default=["ok"])
+        worker = KGraphChatWorker(name="chat", llm=llm, include_conversation=False)
+        await one_node(worker, {"request": {}, "query": {"q": 1}}).run({})
+        assert llm.calls[0]["messages"][-1].content == '{"q": 1}'
+
+
+def test_identifier_check_rejects_a_trailing_newline():
+    from kgraphplanner.worker.error_info import _identifier
+    assert _identifier("req_123") == "req_123"
+    assert _identifier("req_123\n") is None
+
+
+def test_description_is_keyword_only():
+    import inspect
+    params = inspect.signature(KGraphChatWorker).parameters
+    assert params["description"].kind is inspect.Parameter.KEYWORD_ONLY
+    positional = [n for n, p in params.items() if p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    assert positional.index("record_args") + 1 < len(positional)
+    assert "description" not in positional

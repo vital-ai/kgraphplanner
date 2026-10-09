@@ -241,7 +241,12 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             # seeded, so seeded keys win and undeclared keys keep their defaults.
             declared = (copy.deepcopy(start_node.initial_data.get("args", start_node.initial_data))
                         if start_node is not None else None)
-            start = copy.deepcopy(results["start"]) if "start" in results else None
+            # arun()/run() take start data only as start_data, so a results
+            # ["start"] already in state is the previous run's, persisted on a
+            # reused thread: rebuild from the spec instead. A direct ainvoke
+            # may seed results["start"] itself, so it is kept there.
+            seeded = "start" in results and not run_input.get("fresh_start")
+            start = copy.deepcopy(results["start"]) if seeded else None
             if start is None:
                 start = declared
             elif isinstance(start, dict) and isinstance(declared, dict):
@@ -794,7 +799,9 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
 
     @staticmethod
     def _initial_state(messages, start_data, deadline, grace=None) -> Dict[str, Any]:
-        run_input: Dict[str, Any] = {}
+        # fresh_start: rebuild start from the spec and start_data, ignoring a
+        # start persisted by an earlier run on the same thread.
+        run_input: Dict[str, Any] = {"fresh_start": True}
         if start_data is not None:
             run_input["start_data"] = start_data
         if deadline is not None:
@@ -803,7 +810,7 @@ class KGraphExecGraphAgent(KGraphBaseAgent):
             run_input["grace"] = grace
         return {
             "messages": messages or [],
-            "agent_data": {"run_input": run_input} if run_input else {},
+            "agent_data": {"run_input": run_input},
             "work": {},
         }
 

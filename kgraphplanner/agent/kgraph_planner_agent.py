@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from kgraphplanner.agent.kgraph_base_agent import KGraphBaseAgent, AgentState
 from kgraphplanner.worker.kgraph_worker import KGraphWorker
+from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.program.program import ProgramSpec
 from kgraphplanner.program.program_expander import (
     validate_program_spec, expand_program_to_graph
@@ -115,6 +116,14 @@ PLANNER_SIMPLE_EXAMPLE = """{
 }"""
 
 
+
+def _validation_summary(e: ValidationError) -> str:
+    """A pydantic error without the offending input values: the count, and
+    each error's location and type."""
+    parts = [f"{'.'.join(str(p) for p in err.get('loc', ())) or '<root>'} ({err.get('type')})"
+             for err in e.errors(include_input=False, include_url=False)[:10]]
+    return f"{e.error_count()} schema validation error(s): " + ", ".join(parts)
+
 class KGraphPlannerAgent(KGraphBaseAgent):
     """
     Agent that plans and executes a dynamic workflow from a natural language request.
@@ -192,7 +201,11 @@ class KGraphPlannerAgent(KGraphBaseAgent):
             *messages
         ]
         
+        # last_error is fed back to the planner model. last_summary is what
+        # logs and the final error carry: no provider text, and no echo of
+        # the model's output (a schema error quotes the offending input).
         last_error = None
+        last_summary = None
         for attempt in range(1 + max_retries):
             all_messages = list(base_messages)
             
@@ -209,17 +222,20 @@ class KGraphPlannerAgent(KGraphBaseAgent):
                 program = await model.ainvoke(all_messages)
             except ValidationError as e:
                 last_error = str(e)
-                logger.warning(f"Attempt {attempt + 1} schema validation failed: {last_error}")
+                last_summary = _validation_summary(e)
+                logger.warning(f"Attempt {attempt + 1} schema validation failed: {last_summary}")
                 continue
             except Exception as e:
-                last_error = str(e)
-                logger.warning(f"Attempt {attempt + 1} LLM error: {last_error}")
+                # Provider error text can echo the request; the model doesn't
+                # need it to retry.
+                last_error = last_summary = describe_error(e)
+                logger.warning(f"Attempt {attempt + 1} LLM error: {last_summary}")
                 continue
             
             # Validate
             is_valid, validation_messages = validate_program_spec(program)
             if not is_valid:
-                last_error = "; ".join(validation_messages)
+                last_error = last_summary = "; ".join(validation_messages)
                 logger.warning(f"Attempt {attempt + 1} program validation failed: {last_error}")
                 continue
             
@@ -231,7 +247,7 @@ class KGraphPlannerAgent(KGraphBaseAgent):
             try:
                 self.exec_agent(self.expand(program))
             except ValueError as e:
-                last_error = str(e)
+                last_error = last_summary = str(e)
                 logger.warning(f"Attempt {attempt + 1} graph validation failed: {last_error}")
                 continue
             
@@ -245,7 +261,7 @@ class KGraphPlannerAgent(KGraphBaseAgent):
         
         raise ValueError(
             f"LLM failed to generate valid ProgramSpec after {1 + max_retries} attempts. "
-            f"Last error: {last_error}"
+            f"Last error: {last_summary}"
         )
     
     def workers_prompt(self) -> str:

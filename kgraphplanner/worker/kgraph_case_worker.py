@@ -9,7 +9,7 @@ from langgraph.graph import StateGraph
 from langgraph.runtime import get_runtime
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-from kgraphplanner.worker.kgraph_worker import KGraphWorker
+from kgraphplanner.worker.kgraph_worker import KGraphWorker, is_present
 from kgraphplanner.worker.llm_usage import extract_usage, usage_state_update
 from kgraphplanner.worker.error_info import describe_error
 from kgraphplanner.worker.worker_errors import WorkerError, WorkerLLMError
@@ -112,7 +112,7 @@ class KGraphCaseWorker(KGraphWorker):
             # Get the user input to categorize
             # The first non-empty of these; raises below if none is.
             user_input = self._first_input(args, ("query", "message", "input"))
-            if not user_input:
+            if not is_present(user_input):
                 error_msg = "No input provided for categorization"
                 writer({
                     "phase": "case_error",

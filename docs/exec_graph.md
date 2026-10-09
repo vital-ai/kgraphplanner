@@ -140,10 +140,17 @@ Neither `run` nor `arun` modifies the `config` or `start_data` you pass in.
 
 ### Per-run state
 
-Each run starts clean: results (except `start`), activations, traversal
-counts, errors, trace, usage and worker scratch slots are reset. This also
-applies on a reused checkpointed thread, so a condition can never read a result
-from an earlier turn. Only `messages` (the conversation) carries over.
+Each run starts clean: results, activations, traversal counts, errors, trace,
+usage and worker scratch slots are reset. This also applies on a reused
+checkpointed thread, so a condition can never read a result from an earlier
+turn. Only `messages` (the conversation) carries over.
+
+`start` is rebuilt each run from the `StartNodeSpec` defaults, `start_data`
+and the injected last human message, when the run comes through `arun()` or
+`run()`. A direct `ainvoke` of the compiled graph may seed
+`agent_data.results["start"]` itself; that seed is used (with the spec
+defaults under it). If a direct `ainvoke` on a reused thread doesn't seed it,
+the previous run's `start` is still there, so seed it on every call.
 
 ## Routing
 
@@ -177,8 +184,9 @@ Guards see `result` = the start data (after `start_data`, the injected last
 human message and the `StartNodeSpec` defaults are applied), plus `results`
 and `run`. They are evaluated once per run, when the run starts, so a guard
 on `run.now` or `run.time_left` gives one answer for the whole start step.
-`max_traversals`, `on_exhausted` and `on_error` aren't allowed on
-start edges.
+`max_traversals`, `on_exhausted` and `on_error` aren't allowed on guarded
+start edges. On an unconditional start edge, `max_traversals` and
+`on_exhausted` are ignored with a build warning, as in 0.2.0.
 
 Example: run five classifiers in parallel, but skip the reactive one when a
 run has no inbound message:
@@ -193,7 +201,7 @@ EdgeSpec(source="start", destination="blocker_classifier", bindings=...),
 
 **A skipped node writes no result, and a binding from a node that hasn't run
 is skipped,** so it doesn't write `None`. This applies to bindings on every
-edge, not only after a start guard (see "Changes in 0.2.1", item 6). Give the downstream node a default
+edge, not only after a start guard (see "Changes in 0.2.1", item 9). Give the downstream node a default
 for that arg (`WorkerNodeSpec.defaults["args"]`) when it needs an explicit
 "absent" value:
 
@@ -688,21 +696,48 @@ These changes alter behaviour that existing specs may rely on:
    identifiers, error bodies, raw responses or tracebacks in tool logs. What
    tools return to the model is unchanged. Every tool's config now includes
    `log_content`.
-3. **`concat_text`** no longer raises on a `None` or non-string value. A
+3. **Config flags are parsed strictly.** `tools.log_content` and the other
+   boolean settings accept true/false, yes/no, on/off and 1/0 in any case;
+   any other value is a `ValueError`. Before, a string such as `"False"` from
+   `KGPLAN__TOOLS__LOG_CONTENT=False` was truthy and switched logging on.
+4. **Planner errors carry no provider or model text.** A planner LLM error
+   is logged, fed back to the model and raised as `describe_error` output. A
+   schema error is still fed back in full (the model needs it to repair its
+   output), but logs and the final `ValueError` (and so `errors["planner"]`)
+   give only its count, locations and types.
+5. **`concat_text`** no longer raises on a `None` or non-string value. A
    binding error is raised unchanged (same type and message), with a note
    naming its edge and params; the note holds no bound values.
-4. **A caller-seeded `results["start"]` keeps the `StartNodeSpec` defaults**
+6. **A caller-seeded `results["start"]` keeps the `StartNodeSpec` defaults**
    for keys it omits. They used to be replaced, so omitted keys resolved to
    `None`.
-5. **Conditions on start edges are guards** (new), evaluated once when the
+7. **`start` is rebuilt every `arun()` / `run()`** from the spec defaults,
+   `start_data` and the injected message. On a reused checkpointed thread the
+   previous run's `start` used to carry over, so keys from an earlier
+   `start_data` were still visible (a guard such as `has:inbound_message`
+   would fire on a run with no message). A direct `ainvoke` that seeds
+   `results["start"]` is unchanged.
+8. **Conditions on start edges are guards** (new), evaluated once when the
    run starts. `KGraphPlannerAgent` rejects a `ConditionalSpec` from `start`.
-6. **A binding from a node that hasn't run is skipped, on every edge.** It
-   used to write `None` into the destination's args, over a node default or
-   an earlier binding. Now the param is left as it was. A binding to a path
-   that is missing on a node that *did* run still resolves to `None`. This
-   matters wherever a destination is reached after a skipped branch: a
-   start guard, a conditional route, or a fan-in from a node that didn't run.
-7. **`presence_gate`** (new) and optional worker descriptions in the planner
-   prompt.
-8. **Case and chat workers use the first non-empty input key.** An empty
-   `query` used to win over a set `input` / `message`.
+9. **Breaking: a binding from a node that hasn't run is skipped, on every
+   edge.** It used to write `None` into the destination's args, over a node
+   default or an earlier binding. Now the param is left as it was: it keeps a
+   node default, or is absent. A binding to a path that is missing on a node
+   that *did* run still resolves to `None`. This affects any destination
+   reached after a skipped branch: a start guard, a conditional route, or a
+   fan-in from a node that didn't run. Code that relied on the `None` can
+   break:
+   - a function worker reading `args["input"]` raises `KeyError`;
+   - a chat worker whose only binding was skipped raises "no prompt or args
+     to respond to" instead of sending `"input: None"`.
+
+   Read optional args with `args.get(...)`, or give the node a default in
+   `WorkerNodeSpec.defaults["args"]`.
+10. **`presence_gate`** (new) and optional worker descriptions in the
+    planner prompt. `KGraphWorker.description` is keyword-only, so subclass
+    fields keep their 0.2.0 positional order.
+11. **Case and chat workers use the first non-empty input key,** by the
+    presence gate's rule: None, a blank string or an empty collection is
+    skipped; 0 and False count. An empty `query` used to win over a set
+    `input` / `message`. A non-string input a chat worker sends directly is
+    sent as JSON.

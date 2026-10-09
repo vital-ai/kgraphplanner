@@ -18,25 +18,13 @@ inputs, since their conditionals can't originate from ``start``.
 from typing import Any, Dict, Optional
 
 from kgraphplanner.worker.kgraph_function_worker import KGraphFunctionWorker
-from kgraphplanner.worker.kgraph_worker import DIRECTIVE_KEYS
+from kgraphplanner.worker.kgraph_worker import DIRECTIVE_KEYS, is_present  # noqa: F401 (re-exported)
 
 DEFAULT_GATE_DESCRIPTION = (
     "Deterministic gate, no LLM call. Bind the inputs to check; its result "
     "present.<arg> is true when that input is non-empty, and inputs.<arg> "
     "holds the value. Branch with conditionals on has:present.<arg>."
 )
-
-
-def is_present(value: Any) -> bool:
-    """False for None, an empty or whitespace-only string, or an empty
-    collection. Anything else is present, including 0 and False."""
-    if value is None:
-        return False
-    if isinstance(value, str):
-        return bool(value.strip())
-    if isinstance(value, (list, tuple, dict, set)):
-        return len(value) > 0
-    return True
 
 
 def _presence(args: Dict[str, Any]) -> Dict[str, Any]:

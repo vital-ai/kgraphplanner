@@ -28,7 +28,7 @@ from kgraphplanner.worker.worker_errors import WorkerError, WorkerTimeoutError
 
 # Provider codes and request ids are enumerations or opaque ids. Anything that
 # doesn't look like one (spaces, prose) is dropped rather than echoed.
-_IDENTIFIER = re.compile(r"^[A-Za-z0-9_.:\-]{1,80}$")
+_IDENTIFIER = re.compile(r"[A-Za-z0-9_.:\-]{1,80}")
 
 
 def error_chain(exc: BaseException) -> Iterator[BaseException]:
@@ -86,7 +86,7 @@ def failure_kinds(exc: BaseException) -> set:
 
 
 def _identifier(value: Any) -> Optional[str]:
-    return value if isinstance(value, str) and _IDENTIFIER.match(value) else None
+    return value if isinstance(value, str) and _IDENTIFIER.fullmatch(value) else None
 
 
 def _provider_details(exc: BaseException) -> List[str]:
