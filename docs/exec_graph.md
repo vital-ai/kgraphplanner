@@ -141,7 +141,8 @@ Neither `run` nor `arun` modifies the `config` or `start_data` you pass in.
 ### Per-run state
 
 Each run starts clean: results, activations, traversal counts, errors, trace,
-usage and worker scratch slots are reset. This also applies on a reused
+usage, worker scratch slots and the start-guard record
+(`agent_data.start_guards`) are reset. This also applies on a reused
 checkpointed thread, so a condition can never read a result from an earlier
 turn. Only `messages` (the conversation) carries over.
 
@@ -179,6 +180,11 @@ are usually a parallel fan-out, so a condition there is a **guard**:
 - Unconditional start edges always fire.
 - A `__default__` start edge fires only if no other start edge fired.
 - If no start edge fires at all, the run raises `ExecGraphRoutingError`.
+
+The guards are evaluated once, when the run starts, and the result is stored
+in `agent_data.start_guards`: the positions, among the graph's active start
+edges, of the edges that fired. It's internal bookkeeping for wiring the
+start step, not an API; read the trace to see which nodes ran.
 
 Guards see `result` = the start data (after `start_data`, the injected last
 human message and the `StartNodeSpec` defaults are applied), plus `results`
@@ -322,8 +328,8 @@ Per node, in `WorkerNodeSpec`:
 
 **Error messages carry no provider text.**
 - A `WorkerError`'s message names the exception class, HTTP status, failure
-  category, and the provider's error code and request id when they are
-  identifier-shaped. For example:
+  category, and the provider's error code, error type and request id when
+  they are identifier-shaped (`code=`, `type=`, `request_id=`). For example:
   `LLM call failed: BadRequestError (HTTP 400, client_error, code=context_length_exceeded, request_id=req_123)`.
 - The provider's own text can echo the request, so it's included only with
   `log_content=True` on the worker.
@@ -699,9 +705,21 @@ These changes alter behaviour that existing specs may rely on:
 
 ## Changes in 0.2.1
 
+> **Some of these changes can break existing callers.** Check these before
+> upgrading:
+>
+> - item 3, strict boolean config: an unrecognised value fails at startup,
+>   and `False`/`no`/`off` now really mean false;
+> - item 7, `start` rebuilt on every `arun()` / `run()`;
+> - item 9, bindings from a node that hasn't run are skipped instead of
+>   written as `None`;
+> - item 11, the chat worker sends a non-string input as JSON;
+> - item 12, an interrupt reply is added to `messages`.
+
 1. **Error messages carry no provider text by default.** `WorkerLLMError`
    messages, and so `errors[node]` / `RunResult.errors`, name the class,
-   status, category, provider code and request id instead. Set
+   status, category, provider error code, error type and request id
+   instead. Set
    `log_content=True` on the worker for the full text; the original is on
    `.cause`.
 2. **Tool logs follow `ToolConfig.log_content`** (default off): no queries,
@@ -722,6 +740,8 @@ These changes alter behaviour that existing specs may rely on:
      needs TLS.
    - Any other value (a typo, `"maybe"`) is a `ValueError` at startup,
      instead of silently counting as true.
+   - An empty value (for example `KGPLAN__TOOLS__LOG_CONTENT=`) counts as
+     false.
    - Lowercase `true`/`false` and `1`/`0` behave as before.
 4. **Planner errors carry no provider or model text.** A planner LLM error
    is logged, fed back to the model and raised as `describe_error` output. A
