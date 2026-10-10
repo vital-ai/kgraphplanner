@@ -490,7 +490,10 @@ class KGraphChatWorker(KGraphWorker):
                 user_provided_info=user_reply,
                 previous_attempts=tried,
             )
-            result["messages"] = [AIMessage(content=question)]
+            # The question and the customer's answer both join the
+            # conversation, so later chat workers see the exchange.
+            reply_text = user_reply if isinstance(user_reply, str) else json.dumps(user_reply, default=str)
+            result["messages"] = [AIMessage(content=question), HumanMessage(content=reply_text)]
             logger.info(
                 f"⏱️ [{time.strftime('%H:%M:%S')}] Chat worker '{occurrence_id}' "
                 f"END ({time.time() - _t0:.1f}s)"

@@ -212,7 +212,7 @@ agent = KGraphToolAgent(
 Wire workers into a declarative graph with bindings, conditional routing,
 bounded loops, per-node timeouts and retries, and a run deadline. See
 [docs/exec_graph.md](docs/exec_graph.md) for a complete example, the routing
-rules, and the v0.2.0 migration notes.
+rules, and the migration notes for v0.2.0 and v0.2.1.
 
 ```python
 agent = KGraphExecGraphAgent(name="explain", graph_spec=spec, worker_registry=workers)

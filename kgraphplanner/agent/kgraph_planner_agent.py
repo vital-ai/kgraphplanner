@@ -45,7 +45,7 @@ Rules:
    c) Every fan_out branch MUST have bindings to forward the source's output: "bindings": {"input": [{"from_node_tpl": "research_{idx}", "path": "$.result_text"}]}
    d) fan_in uses param+reduce instead of per-edge bindings (this is correct as-is).
 10) Keep it succinct; never emit an already-expanded graph. No duplicates.
-11) Conditional branches use declarative conditions only: "has:<key>", "eq:<key>:<value>", "always", or "on_error". Python expressions are rejected. Give conditionals a default_destination_tpl when no branch may match. Conditionals cannot originate from "start": use fan_out for parallel starts, or route from a worker (to branch on the request's own inputs, route from a gate worker if one is listed).
+11) Conditional branches use declarative conditions only: "has:<key>", "eq:<key>:<value>", "always", or "on_error". Python expressions are rejected. Give conditionals a default_destination_tpl when no branch may match. Branches are tried in order and the first match wins: for the fallback use default_destination_tpl, never an "always" branch. Conditionals cannot originate from "start": use fan_out for parallel starts, or route from a worker (to branch on the request's own inputs, route from a gate worker if one is listed).
 
 Return ONLY a valid ProgramSpec JSON object."""
 

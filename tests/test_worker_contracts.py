@@ -18,6 +18,7 @@ What must hold now:
 import asyncio
 import logging
 import time
+import warnings
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -359,6 +360,9 @@ class TestStructuredWorker:
     def anthropic_payload(llm, method):
         """The Messages API request body with_structured_output would send."""
         raw = llm.with_structured_output(Plan, method=method, include_raw=True).first.steps__["raw"]
+        # langchain-anthropic >=1.7 wraps the binding in a RunnableSequence.
+        if not hasattr(raw, "kwargs"):
+            raw = next(step for step in raw.steps if hasattr(step, "kwargs"))
         kwargs = {k: v for k, v in raw.kwargs.items() if k != "ls_structured_output_format"}
         return llm._get_request_payload([HumanMessage(content="x")], **kwargs)
 
@@ -374,8 +378,15 @@ class TestStructuredWorker:
         assert "tool_choice" not in payload and "tools" not in payload
         assert payload["output_config"]["format"]["type"] == "json_schema"
 
-        forced = self.anthropic_payload(llm, "function_calling")
-        assert forced["tool_choice"] == {"type": "tool", "name": "Plan"}
+        # The tool-call path, for contrast. Older langchain-anthropic forces
+        # the tool (tool_choice); >=1.7 knows this model rejects that and only
+        # offers it.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            tool_path = self.anthropic_payload(llm, "function_calling")
+        assert [t["name"] for t in tool_path["tools"]] == ["Plan"]
+        assert "output_config" not in tool_path
+        assert tool_path.get("tool_choice") in (None, {"type": "tool", "name": "Plan"})
 
     def test_bound_kwargs_survive_structured_output(self):
         from langchain_anthropic import ChatAnthropic
@@ -733,3 +744,28 @@ class TestSegmentedDirective:
         worker = KGraphChatWorker(name="c", llm=ScriptedLLM(), system_directive=self.SEGMENTS)
         directive, args = worker._split_directive({"system_directive_append": "extra", "x": 1})
         assert directive[-1] == {"text": "extra"} and args == {"x": 1}
+
+
+# ---------------------------------------------------------------------------
+# Interrupt orchestration: the reply joins the conversation
+# ---------------------------------------------------------------------------
+
+async def test_interrupt_reply_is_added_to_the_conversation():
+    # The node runs again from the top on resume, so the question is drafted twice.
+    llm = ScriptedLLM(default=["What is your loan ID?"] * 2)
+    chat = KGraphChatWorker(name="orchestrator", llm=llm, enable_interrupt=True)
+    spec = GraphSpec(graph_id="i", nodes=[
+        StartNodeSpec(initial_data={"args": {"lookup": {"found": False, "tried": ["email"]}}}),
+        EndNodeSpec(), WorkerNodeSpec(id="ask", worker_name="orchestrator")],
+        edges=[EdgeSpec(source="start", destination="ask",
+                        bindings={"lookup_result": [Binding(from_node="start", path="$.lookup")]}),
+               EdgeSpec(source="ask", destination="end")])
+    agent = KGraphExecGraphAgent(name="i", graph_spec=spec, worker_registry={"orchestrator": chat},
+                                 checkpointer=MemorySaver())
+    cfg = {"configurable": {"thread_id": "reply1"}}
+    first = await agent.arun(messages=[HumanMessage(content="what's my balance?")], config=cfg)
+    assert "__interrupt__" in first
+    final = await agent.get_compiled_graph().ainvoke(Command(resume="LN-98765"), cfg)
+    tail = [(type(m).__name__, m.content) for m in final["messages"][-2:]]
+    assert tail == [("AIMessage", "What is your loan ID?"), ("HumanMessage", "LN-98765")]
+    assert final["agent_data"]["results"]["ask"]["user_provided_info"] == "LN-98765"

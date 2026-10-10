@@ -109,7 +109,9 @@ def build_workers(
         system_directive=load_prompt("tool_executor"),
         tool_manager=tool_manager,
         available_tool_ids=TOOL_IDS,
-        max_iters=10,
+        # 5 decisions, then a summary. Before 0.2.0 each decision was counted
+        # twice, so the old max_iters=10 allowed about 5; this keeps that.
+        max_iters=5,
     )
 
     final_responder = KGraphChatWorker(

@@ -767,3 +767,19 @@ These changes alter behaviour that existing specs may rely on:
       `query`, `message` or `worker_output`) is now sent as JSON. It used to
       go through `str()`, so the model saw `{'a': 1}` where it now sees
       `{"a": 1}`.
+12. **A chat worker's interrupt reply joins the conversation.** With
+    `enable_interrupt=True`, a resumed lookup loop used to add only its
+    question to `messages`; the customer's answer went only into the node's
+    result as `user_provided_info`. Now the reply is also appended as a
+    `HumanMessage` after the question, so later chat workers with
+    `include_conversation=True` see the whole exchange. A non-string resume
+    value is sent as JSON.
+13. **The planner's `always` branches.** Branches are tried in order and the
+    first match wins, so an `always` branch hides everything after it.
+    `validate_program_spec` now rejects an `always` branch that isn't last
+    (the planner re-plans), and warns when a conditional has both an `always`
+    branch and `default_destination_tpl`, since the default is never used.
+    The planner prompt tells the model to use `default_destination_tpl` for
+    the fallback.
+14. **Sample `general_agent`:** its tool executor's `max_iters` is now 5,
+    which keeps the limit it effectively had before item 17 of 0.2.0.

@@ -1,0 +1,53 @@
+name: Dependency caps
+
+# pyproject.toml caps a few dependencies (see the comments there). This job
+# shows when a cap can be lifted: it reports which caps hold back a release,
+# then installs with every upper bound removed and runs the offline tests.
+# A failure here means "a cap is still doing its job", not a broken main, so
+# it runs on a schedule and on demand, never on push.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unpinned:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Report caps that hold back a release
+        run: |
+          pip install packaging
+          python scripts/check_dependency_caps.py
+
+      - name: Remove upper bounds
+        run: |
+          python - <<'EOF'
+          import re
+          from pathlib import Path
+          p = Path("pyproject.toml")
+          s = p.read_text()
+          # ">=1.3.0,<2" -> ">=1.3.0" and "<2" alone -> "" inside dependency strings.
+          s = re.sub(r',\s*<=?\s*[\w.]+(?=")', "", s)
+          s = re.sub(r'(")(?P<name>[A-Za-z0-9_.\[\]-]+)<=?\s*[\w.]+(?=")', r"\1\g<name>", s)
+          p.write_text(s)
+          EOF
+          git diff pyproject.toml
+
+      - name: Install latest
+        run: pip install . pytest pytest-asyncio
+
+      - name: Resolved versions of the capped packages
+        run: pip list 2>/dev/null | grep -iE "^(langchain-openai|langsmith|httpx|authlib|weaviate-client|deepagents|openai) "
+
+      - name: Offline tests
+        run: python -m pytest -m "not integration and not timing"

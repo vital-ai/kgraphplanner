@@ -51,6 +51,23 @@ def validate_program_spec(program: ProgramSpec) -> Tuple[bool, List[str]]:
                 "parallel starts, or route from a worker (start -> classifier or gate "
                 "worker -> conditional branches)")
             return False, messages
+
+    # Branches are tried in order and the first match wins, so an "always"
+    # branch hides every branch after it, and the default.
+    for cond in program.conditionals:
+        always = [i for i, br in enumerate(cond.branches)
+                  if br.condition.strip().lower() in ("always", "true")]
+        if any(i < len(cond.branches) - 1 for i in always):
+            messages.append(
+                f"ERROR: conditional from '{cond.source_tpl}' has an 'always' branch before "
+                f"other branches; they can never be taken. Put the fallback in "
+                f"default_destination_tpl instead of an 'always' branch")
+            return False, messages
+        if always and cond.default_destination_tpl:
+            messages.append(
+                f"WARNING: conditional from '{cond.source_tpl}' has both an 'always' branch and "
+                f"default_destination_tpl; the default is never used. Use only "
+                f"default_destination_tpl for the fallback")
     
     if "end" not in node_ids:
         messages.append("ERROR: 'end' node is required")

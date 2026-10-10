@@ -568,3 +568,43 @@ def test_description_is_keyword_only():
     positional = [n for n, p in params.items() if p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD]
     assert positional.index("record_args") + 1 < len(positional)
     assert "description" not in positional
+
+
+class TestPlannerAlwaysBranches:
+    """First match wins, so an "always" branch hides what follows it."""
+
+    def program(self, branches, default=None):
+        from kgraphplanner.program.program import ProgramSpec
+        return ProgramSpec.model_validate({
+            "program_id": "p",
+            "static_nodes": [{"id": "start", "worker": "start"}, {"id": "g", "worker": "researcher"},
+                             {"id": "a", "worker": "researcher"}, {"id": "b", "worker": "researcher"},
+                             {"id": "end", "worker": "end"}],
+            "static_edges": [{"source": "start", "destination": "g"},
+                             {"source": "a", "destination": "end"}, {"source": "b", "destination": "end"}],
+            "conditionals": [{"source_tpl": "g", "branches": branches,
+                              **({"default_destination_tpl": default} if default else {})}],
+            "exit_nodes": ["end"],
+        })
+
+    def validate(self, *args, **kwargs):
+        from kgraphplanner.program.program_expander import validate_program_spec
+        return validate_program_spec(self.program(*args, **kwargs))
+
+    def test_always_before_other_branches_is_an_error(self):
+        ok, messages = self.validate([{"condition": "always", "destination_tpl": "b"},
+                                      {"condition": "has:x", "destination_tpl": "a"}])
+        assert not ok and any("'always' branch before other branches" in m for m in messages)
+
+    def test_always_next_to_a_default_warns(self):
+        ok, messages = self.validate([{"condition": "has:x", "destination_tpl": "a"},
+                                      {"condition": "always", "destination_tpl": "b"}], default="b")
+        assert ok and any(m.startswith("WARNING") and "default is never used" in m for m in messages)
+
+    def test_default_alone_is_clean(self):
+        ok, messages = self.validate([{"condition": "has:x", "destination_tpl": "a"}], default="b")
+        assert ok and not any("always" in m for m in messages)
+
+    def test_prompt_states_the_rule(self):
+        from kgraphplanner.agent.kgraph_planner_agent import PLANNER_SYSTEM_PROMPT
+        assert 'never an "always" branch' in PLANNER_SYSTEM_PROMPT
