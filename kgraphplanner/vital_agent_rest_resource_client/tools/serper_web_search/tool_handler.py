@@ -1,5 +1,5 @@
 from typing import Dict
-from kgraphplanner.vital_agent_rest_resource_client.tools.tool_handler import ToolHandler
+from kgraphplanner.vital_agent_rest_resource_client.tools.tool_handler import ToolHandler, build_model
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_parameters import ToolParameters
 from kgraphplanner.vital_agent_rest_resource_client.tools.serper_web_search.models import (
     SerperWebSearchInput, SerperWebSearchOutput, SerperSearchResult,
@@ -35,52 +35,29 @@ class SerperWebSearchToolHandler(ToolHandler):
         api_error = tool_output.get('api_error')
         api_status_code = tool_output.get('api_status_code')
 
-        # Parse search results
+        # Parse search results. Every field the model declares comes through;
+        # only the older key spellings and the defaults are filled in here.
         search_results = []
         for result in search_results_data:
-            search_result = SerperSearchResult(
-                title=result.get('title', ''),
-                link=result.get('link', result.get('url', '')),
-                snippet=result.get('snippet'),
-                position=result.get('position'),
-                displayed_link=result.get('displayed_link', result.get('display_url')),
-                source=result.get('source'),
-                date=result.get('date'),
-                result_type=result.get('result_type', 'organic'),
-                price=result.get('price'),
-                rating=result.get('rating'),
-                rating_count=result.get('rating_count'),
-                image_url=result.get('image_url'),
-                thumbnail=result.get('thumbnail'),
-                address=result.get('address'),
-                phone=result.get('phone'),
-                cid=result.get('cid'),
-            )
-            search_results.append(search_result)
+            data = dict(result)
+            data['title'] = data.get('title') or ''
+            data['link'] = data.get('link') or data.get('url') or ''
+            data.setdefault('displayed_link', data.get('display_url'))
+            data['result_type'] = data.get('result_type') or 'organic'
+            search_results.append(build_model(SerperSearchResult, data))
 
         # Parse knowledge graph
         knowledge_graph = None
         if knowledge_graph_data:
-            knowledge_graph = SerperKnowledgeGraph(
-                title=knowledge_graph_data.get('title'),
-                type=knowledge_graph_data.get('type'),
-                description=knowledge_graph_data.get('description'),
-                attributes=knowledge_graph_data.get('attributes'),
-                source=knowledge_graph_data.get('source'),
-                header_images=knowledge_graph_data.get('header_images'),
-            )
+            knowledge_graph = build_model(SerperKnowledgeGraph, knowledge_graph_data)
 
         # Parse people also ask
         people_also_ask = []
         if people_also_ask_data:
             for question_data in people_also_ask_data:
-                related_question = SerperRelatedQuestion(
-                    question=question_data.get('question', ''),
-                    snippet=question_data.get('snippet'),
-                    title=question_data.get('title'),
-                    link=question_data.get('link'),
-                )
-                people_also_ask.append(related_question)
+                data = dict(question_data)
+                data['question'] = data.get('question') or ''
+                people_also_ask.append(build_model(SerperRelatedQuestion, data))
 
         # Extract query from tool parameters
         query = getattr(tool_parameters, 'search_query', 'Unknown query')

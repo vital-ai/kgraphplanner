@@ -53,7 +53,8 @@ KGraphPlanner provides a layered architecture for constructing AI agent pipeline
 Built-in tools that connect to a tool server endpoint:
 
 - `google_web_search_tool` — Web search via Google
-- `place_search_tool` — Place/business lookup
+- `serper_web_search_tool` — Web, news, image, shopping and places search via Serper
+- `place_search_tool` — Place/business lookup, with Google rating and review count
 - `google_address_validation_tool` — Address validation
 - `weather_tool` — Weather data
 
@@ -212,7 +213,8 @@ agent = KGraphToolAgent(
 Wire workers into a declarative graph with bindings, conditional routing,
 bounded loops, per-node timeouts and retries, and a run deadline. See
 [docs/exec_graph.md](docs/exec_graph.md) for a complete example, the routing
-rules, and the migration notes for v0.2.0 and v0.2.1.
+rules, and the migration notes for v0.2.0 and v0.2.1. Later changes are in
+[CHANGELOG.md](CHANGELOG.md).
 
 ```python
 agent = KGraphExecGraphAgent(name="explain", graph_spec=spec, worker_registry=workers)

@@ -1,6 +1,6 @@
 from typing import Dict
 from .models import PlaceSearchOutput, PlaceDetails
-from kgraphplanner.vital_agent_rest_resource_client.tools.tool_handler import ToolHandler
+from kgraphplanner.vital_agent_rest_resource_client.tools.tool_handler import ToolHandler, build_model
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_parameters import ToolParameters
 from kgraphplanner.vital_agent_rest_resource_client.tools.tool_results import ToolResults
 
@@ -19,22 +19,13 @@ class PlaceSearchToolHandler(ToolHandler):
 
         place_details_list = []
 
+        # Every field the model declares comes through; only the required
+        # strings get a default.
         for place in place_search_results:
-            place_details = PlaceDetails(
-                name=place.get('name', ''),
-                address=place.get('address', ''),
-                place_id=place.get('place_id', ''),
-                latitude=place.get('latitude'),
-                longitude=place.get('longitude'),
-                business_status=place.get('business_status'),
-                icon=place.get('icon'),
-                types=place.get('types'),
-                url=place.get('url'),
-                vicinity=place.get('vicinity'),
-                formatted_phone_number=place.get('formatted_phone_number'),
-                website=place.get('website')
-            )
-            place_details_list.append(place_details)
+            data = dict(place)
+            for key in ('name', 'address', 'place_id'):
+                data[key] = data.get(key) or ''
+            place_details_list.append(build_model(PlaceDetails, data))
 
         place_search_output = PlaceSearchOutput(
             tool="place_search_tool",

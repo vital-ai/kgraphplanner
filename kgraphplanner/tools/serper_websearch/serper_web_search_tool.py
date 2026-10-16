@@ -43,7 +43,8 @@ class SerperWebSearchTool(AbstractTool):
         @tool(args_schema=SerperWebSearchInput)
         async def serper_web_search_tool(search_query: str, num_results: int = 10,
                                          search_type: str = "search", location: str = None,
-                                         time_period: str = None) -> SerperWebSearchOutput:
+                                         time_period: str = None, language: str = None,
+                                         country: str = None, page: int = None) -> SerperWebSearchOutput:
             """
             Search the web using Serper and return relevant results.
 
@@ -53,6 +54,9 @@ class SerperWebSearchTool(AbstractTool):
                 search_type: Type of search (search/news/images/shopping/places)
                 location: Location for localized search results (e.g., 'New York,New York')
                 time_period: Time period filter (hour/day/week/month/year)
+                language: Google UI language (e.g. 'en')
+                country: Google country code (e.g. 'us')
+                page: Results page, from 1
 
             Returns:
                 SerperWebSearchOutput: Search results with titles, URLs, snippets, and enriched data
@@ -63,7 +67,10 @@ class SerperWebSearchTool(AbstractTool):
                 num_results=num_results,
                 search_type=search_type,
                 location=location,
-                time_period=time_period
+                time_period=time_period,
+                language=language,
+                country=country,
+                page=page,
             )
 
             tool_endpoint = self.config.get("tool_endpoint")

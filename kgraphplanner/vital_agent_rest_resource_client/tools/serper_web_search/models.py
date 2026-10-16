@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Literal, Dict, Any
 
 
@@ -10,7 +10,7 @@ class SerperSearchResult(BaseModel):
     displayed_link: Optional[str] = Field(None, description="Displayed link in search results")
     source: Optional[str] = Field(None, description="Source domain of the result")
     date: Optional[str] = Field(None, description="Publication date if available")
-    result_type: str = Field("organic", description="Type of result (organic, news, shopping, images, places, etc.)")
+    result_type: str = Field("organic", description="Type of result (organic, news, shopping, image, place)")
 
     # Shopping fields
     price: Optional[str] = Field(None, description="Price for shopping results")
@@ -20,17 +20,39 @@ class SerperSearchResult(BaseModel):
     # Image fields
     image_url: Optional[str] = Field(None, description="Image URL for image results")
     thumbnail: Optional[str] = Field(None, description="Thumbnail image URL if available")
+    sitelinks: Optional[List[dict]] = Field(None, description="Sitelinks if present")
 
     # Places fields
     address: Optional[str] = Field(None, description="Address for place results")
-    phone: Optional[str] = Field(None, description="Phone number for place results")
+    phone_number: Optional[str] = Field(None, description="Phone number for place results")
+    phone: Optional[str] = Field(
+        None, exclude=True,  # not serialised: phone_number carries it
+        description="Deprecated: same value as phone_number, kept for existing readers")
+    website: Optional[str] = Field(None, description="Business website for place results")
+    category: Optional[str] = Field(None, description="Business category for place results (e.g. 'RV repair shop')")
     cid: Optional[str] = Field(None, description="Google CID for place results")
+    latitude: Optional[float] = Field(None, description="Latitude for place results")
+    longitude: Optional[float] = Field(None, description="Longitude for place results")
+    price_level: Optional[str] = Field(None, description="Price level for place results (e.g. '$$')")
+
+    @model_validator(mode="after")
+    def _phone_alias(self) -> "SerperSearchResult":
+        # The service sends phone_number. Before 0.2.2 the client read a
+        # `phone` key that never arrived, so `phone` was always None; keep it
+        # filled for code written against it.
+        if self.phone_number is None and self.phone is not None:
+            self.phone_number = self.phone
+        elif self.phone is None:
+            self.phone = self.phone_number
+        return self
 
 
 class SerperKnowledgeGraph(BaseModel):
     title: Optional[str] = Field(None, description="Knowledge graph title")
     type: Optional[str] = Field(None, description="Knowledge graph type")
     description: Optional[str] = Field(None, description="Knowledge graph description")
+    website: Optional[str] = Field(None, description="Knowledge graph website")
+    image_url: Optional[str] = Field(None, description="Knowledge graph image URL")
     attributes: Optional[Dict[str, Any]] = Field(None, description="Key-value attributes")
     source: Optional[dict] = Field(None, description="Source information")
     header_images: Optional[List[dict]] = Field(None, description="Header images")
@@ -51,9 +73,12 @@ class SerperWebSearchInput(BaseModel):
         "search", description="Type of search to perform"
     )
     location: Optional[str] = Field(None, description="Location for localized search results (e.g., 'New York,New York')")
+    language: Optional[str] = Field(None, description="Google UI language (e.g., 'en' for English)")
+    country: Optional[str] = Field(None, description="Google country code (e.g., 'us')")
     time_period: Optional[Literal["hour", "day", "week", "month", "year"]] = Field(
         None, description="Time period filter for results"
     )
+    page: Optional[int] = Field(None, description="Pagination page number", ge=1)
 
     model_config = {
         "json_schema_extra": {

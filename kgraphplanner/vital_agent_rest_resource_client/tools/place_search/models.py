@@ -15,6 +15,8 @@ class PlaceDetails(BaseModel):
     vicinity: Optional[str] = Field(None, description="Vicinity description")
     formatted_phone_number: Optional[str] = Field(None, description="Formatted phone number")
     website: Optional[str] = Field(None, description="Website URL")
+    rating: Optional[float] = Field(None, description="Google rating, 1-5")
+    user_ratings_total: Optional[int] = Field(None, description="Number of Google reviews")
 
 
 class PlaceSearchInput(BaseModel):
